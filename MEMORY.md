@@ -169,6 +169,16 @@ Kodun bunlarla eşleşmesi beklenir; eşleşmiyorsa **önce kodu** sorgula.
 | **Kapsanmayan satırlar bilinçli** | `xlsx_loader.py` satır 50 (`raw.empty` → boş sayfa atlama) ve 58 (`text` boş → satır atlama) hiç tetiklenmiyor; korpusta boş sayfa/satır yok. %94 kapsam, eşiğin üstünde |
 | **Entegrasyon testleri yine ilk çalıştırmada geçti** | Task 4'teki desen tekrarlandı (plan Step 3 uygulamayı zaten yazdırıyor). Yine probe ile anlamlılık kanıtlandı — bu artık loader task'ları için standart adım |
 
+### Task 6 — Loader dispatch (2026-08-02)
+
+| Konu | Öğrenilen |
+|---|---|
+| **Korpusun tam ölçüsü** | `load_all(data/)` → **219 bölüm, 144.365 karakter**, 6 dosya. Dağılım: Taksonomi 100 (41.295 kr) · SSS 45 (11.378) · Aksef 20 (22.748) · Duxet 20 (54.771) · İK 19 (7.081) · Araç 15 (7.092). Tür bazında: xlsx 145 · pdf 40 · docx 34 |
+| **§3'teki "~95–100 bin karakter" tahmini düşük kalmış** | Gerçek toplam 144.365. Fark büyük ölçüde XLSX'ten: satır başına `Alan: Değer` serileştirmesi alan adlarını 100 satırda tekrar ediyor (taksonomi tek başına 41 bin karakter). Task 7'de beklenen chunk sayısı (250–450) bu yüzden tekrar kontrol edilmeli |
+| **Türkçe dosya adı tuzağı kapandı** | `ik_surecleri_politikası.docx` glob ile bulundu, `source_file` alanına Türkçe `ı` ile geçti. Hiçbir yerde dosya adı sabit yazılmadı |
+| **`~$` filtresi savunma amaçlı** | Word açıkken bıraktığı geçici dosyalar (`~$...docx`) `.docx` uzantılı ama okunamaz. Korpusta şu an yok, testi tetiklemiyor ama üretimde tek satırlık maliyeti var |
+| **Entegrasyon testleri yavaşladı** | `load_all` 3 testte 3 kez çağrılıyor, tam süite 6,4s→21s. Sorun değil ama Task 8'den sonra fixture'a alınması düşünülebilir |
+
 ---
 
 ## 5. Açık Sorular / Bekleyen Kararlar

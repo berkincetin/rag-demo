@@ -5,10 +5,10 @@
 
 **Son güncelleme:** 2026-08-02
 **Aktif bölüm:** Bölüm 1 — RAG Agent
-**Aktif task:** Task 6 — Loader dispatch (`load_all` glob taraması) (henüz başlamadı)
+**Aktif task:** Task 7 — Chunker + atıf etiketleri (henüz başlamadı)
 **Okunacak dosya:** [docs/superpowers/plans/rag-agent/00-overview.md](docs/superpowers/plans/rag-agent/00-overview.md)
-+ [06-loader-dispatch.md](docs/superpowers/plans/rag-agent/06-loader-dispatch.md)
-**Sıradaki somut adım:** Task 6 / Step 1 — `load_all` için kırmızı testi yaz
++ [07-chunker.md](docs/superpowers/plans/rag-agent/07-chunker.md)
+**Sıradaki somut adım:** Task 7 / Step 1 — `build_citation_label` için kırmızı testi yaz
 
 > ⚠️ Aynı anda **tek** task dosyası okunur. Tüm task setini yüklemek gereksiz —
 > global kısıtlar overview'da, komşu task'ların imzaları kendi task'ının
@@ -21,7 +21,7 @@
 | Aşama | Durum |
 |---|---|
 | Planlama (case analizi, veri keşfi, PRD/TRD/task planları) | ✅ Tamamlandı — 2026-08-01 |
-| Bölüm 1 — RAG Agent | 🔄 Devam ediyor (5/14 task) |
+| Bölüm 1 — RAG Agent | 🔄 Devam ediyor (6/14 task) |
 | Bölüm 2 — Satış Analizi | ⬜ Başlamadı (0/7 faz) — Bölüm 1 teslim edilebilir olmadan başlanmaz |
 
 Legend: ⬜ başlamadı · 🔄 devam ediyor · ✅ tamamlandı · ⚠️ engellendi
@@ -40,7 +40,7 @@ Kavramsal arka plan: [docs/bolum1-rag/UYGULAMA-PLANI.md](docs/bolum1-rag/UYGULAM
 | 3 | PDF loader ⚠️ | [03](docs/superpowers/plans/rag-agent/03-pdf-loader.md) | ✅ | 5 unit + 3 integ ✅ | `feat(loaders)` |
 | 4 | DOCX loader (tablolar!) ⚠️ | [04](docs/superpowers/plans/rag-agent/04-docx-loader.md) | ✅ | 3 unit + 3 integ ✅ %100 cov | `feat(loaders)` |
 | 5 | XLSX loader | [05](docs/superpowers/plans/rag-agent/05-xlsx-loader.md) | ✅ | 3 unit + 3 integ ✅ %94 cov | `feat(loaders)` |
-| 6 | Loader dispatch | [06](docs/superpowers/plans/rag-agent/06-loader-dispatch.md) | ⬜ | — | — |
+| 6 | Loader dispatch | [06](docs/superpowers/plans/rag-agent/06-loader-dispatch.md) | ✅ | 2 unit + 3 integ ✅ %100 cov | `feat(loaders)` |
 | 7 | Chunker + atıf etiketleri | [07](docs/superpowers/plans/rag-agent/07-chunker.md) | ⬜ | — | — |
 | 8 | İndeks + ingest | [08](docs/superpowers/plans/rag-agent/08-index-ingest.md) | ⬜ | — | — |
 | 9 | Hibrit retriever 🎯 | [09](docs/superpowers/plans/rag-agent/09-retriever.md) | ⬜ | — | — |
@@ -193,3 +193,4 @@ Her faz kapandığında buraya bir satır eklenir.
 | 2026-08-02 | 1 | Task 3 — PDF loader | `feat(loaders)` | 21 passed, %98 cov | Aksef 12s→20 bölüm, Duxet 24s→20 bölüm; 8+13 yanlış pozitif elendi |
 | 2026-08-02 | 1 | Task 4 — DOCX loader | `feat(loaders)` | 27 passed, %98,86 cov | Araç 54p/9 tablo→15 bölüm, İK 84p/7 tablo→19 bölüm; `1.500 TL/ay` sadece tablodan geliyor |
 | 2026-08-02 | 1 | Task 5 — XLSX loader | `feat(loaders)` | 33 passed, %98,10 cov | Taksonomi tam 100 bölüm; SSS 3 sayfa→45 bölüm. Başlık satırları: 2, 2, **1** |
+| 2026-08-02 | 1 | Task 6 — Loader dispatch | `feat(loaders)` | 38 passed, %98,25 cov | 6 dosya → **219 bölüm / 144.365 karakter**; Türkçe dosya adı glob ile bulundu |

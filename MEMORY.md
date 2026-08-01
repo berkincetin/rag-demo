@@ -179,6 +179,17 @@ Kodun bunlarla eşleşmesi beklenir; eşleşmiyorsa **önce kodu** sorgula.
 | **`~$` filtresi savunma amaçlı** | Word açıkken bıraktığı geçici dosyalar (`~$...docx`) `.docx` uzantılı ama okunamaz. Korpusta şu an yok, testi tetiklemiyor ama üretimde tek satırlık maliyeti var |
 | **Entegrasyon testleri yavaşladı** | `load_all` 3 testte 3 kez çağrılıyor, tam süite 6,4s→21s. Sorun değil ama Task 8'den sonra fixture'a alınması düşünülebilir |
 
+### Task 7 — Chunker (2026-08-02)
+
+| Konu | Öğrenilen |
+|---|---|
+| 🚨 **Plandaki `_split_text` hatalıydı — düzeltildi** | Kod yalnızca `\n\n` sınırında bölüyordu. Tek başına `max_chars`'ı aşan bir paragraf geldiğinde `else` dalı `paragraph[:max_chars]`'ı yazıp **kalanın tamamını** `buffer`'a atıyor, kalan bir daha asla bölünmüyordu. Sonuç: 232 chunk (beklenen 250–450'nin altı) ve **12 chunk 1200 sınırının üstünde, en büyüğü 9.681 karakter** |
+| **Kök neden ölçümle bulundu** | KÜB bölümleri boş satır içermiyor: 91.692 karakterlik PDF+DOCX metni yalnızca **80 paragrafa** bölünüyor, 13'ü 1200'ün üstünde, en uzunu **10.731** karakter. Yani "paragraf sınırında böl" stratejisi bu korpusta tek başına çalışmıyor |
+| **Çözüm: `_hard_split`** | `max_chars`'ı aşan paragraflar önce satır sonu / cümle sonu (`. `) tercih edilerek kesiliyor, uygun sınır pencerenin ilk yarısına düşerse sert kesim yapılıyor. `start += max(cut - overlap, 1)` hem örtüşmeyi hem ilerlemeyi (sonsuz döngü yok) garanti ediyor. Sonuç: **276 chunk, sınır aşımı 0** (PDF 53→97) |
+| **Birikim döngüsü de sızdırıyordu** | Eski kod `buffer[-overlap:] + "\n\n" + paragraph` sonucunu boyut kontrolü olmadan buffer'a yazıyordu. Yeni kod sığmazsa örtüşmeyi bırakıp yalnız paragrafı alıyor — böylece **her parça ≤ max_chars** garanti |
+| **Mevcut birim testi bu hatayı yakalayamıyordu** | `test_long_section_splits...` 400'er karakterlik 6 paragraf kullanıyor; hepsi sınırın altında olduğu için hatalı dal hiç çalışmıyor. Ders: sınır testinde **tek parçanın sınırı aştığı** durum ayrıca test edilmeli |
+| **Chunk sayısı beklentisi doğrulandı** | Düzeltme sonrası 276, planın 250–450 aralığında. Task 6'da not düşülen "144 bin karakter tahminden yüksek" endişesi sorun çıkarmadı |
+
 ---
 
 ## 5. Açık Sorular / Bekleyen Kararlar

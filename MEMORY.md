@@ -139,6 +139,15 @@ Kodun bunlarla eşleşmesi beklenir; eşleşmiyorsa **önce kodu** sorgula.
 | **Sıralama kritik** | Türkçe eşleme `casefold()`'dan **önce** çalışmalı. Aksi halde `İ` → `i` + U+0307 olur, kombine işaret NFKD'den sağ çıkar ve eşitlik bozulur. Test bunu açıkça koruyor (`"̇" not in fold_tr("İZİN")`) |
 | **`fold_tr` boşluk da sıkıştırır** | Sadece harf eşlemesi değil — `\s+` → tek boşluk + `strip()`. Yani arama metni tek satıra iner. `clean_text` ise **paragraf yapısını korur** (`\n\n`), ikisi farklı amaca hizmet eder |
 
+### Task 3 — PDF loader (2026-08-02)
+
+| Konu | Öğrenilen |
+|---|---|
+| **Yanlış pozitif filtresi ölçüldü** | Ham regex eşleşmesi: Aksef **28**, Duxet **33**. Beyaz liste + monoton sıra sonrası ikisi de **20 bölüm**. Yani Aksef'te 8, Duxet'te 13 satır elendi — Duxet'in dipnot yoğunluğu (s.15) veri keşfindeki tespitle uyumlu |
+| **İki filtre birlikte çalışıyor** | Sadece KÜB beyaz listesi yetmez; `_sort_key(...) > last_key` monoton artış şartı, gövde metnindeki tekrar eden `4.2` gibi referansları da eliyor. Biri kaldırılırsa yanlış pozitifler geri gelir |
+| **Ölçülmüş gerçekler tuttu** | Aksef 12 sayfa, Duxet 24 sayfa — veri keşfiyle birebir. `4.3 Kontrendikasyonlar` → sayfa 3 doğrulandı, assertion değiştirilmedi |
+| **Kapsanmayan satırlar bilinçli** | `_one_section_per_page` fallback'i (satır 78, 87) hiç tetiklenmiyor — her iki PDF de bölüm numarası taşıyor. Coverage %98, eşiğin üstünde. Numarasız bir PDF gelirse devreye girecek |
+
 ---
 
 ## 5. Açık Sorular / Bekleyen Kararlar

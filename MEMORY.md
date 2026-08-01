@@ -120,7 +120,16 @@ Kodun bunlarla eşleşmesi beklenir; eşleşmiyorsa **önce kodu** sorgula.
 > Her faz sonunda buraya ekle: ne beklenmedik çıktı, ne zaman kaybettirdi, bir daha nasıl
 > yapılmalı. Boşsa henüz kod yazılmamış demektir.
 
-_(Henüz kayıt yok — implementasyon başlamadı.)_
+### Task 1 — İskelet, config, modeller (2026-08-02)
+
+| Konu | Öğrenilen |
+|---|---|
+| **Ortam kurulumu** | `.venv` + `pip install -r requirements.txt` **birkaç dakika sürüyor** — `sentence-transformers` PyTorch'u (~200 MB) çekiyor. Arka planda başlat, beklerken test/kod yazmaya devam et |
+| **RED'i doğrulamak için pytest şart değil** | pytest kurulumu beklenirken `python -c "from src.rag.config import Config"` ile `ModuleNotFoundError` doğrudan görülebilir. Kurulum bitince resmî `pytest -v` çıktısı yine alınır |
+| **`.gitignore` zaten hazırdı** | Task 1 Step 4 `.venv/`, `storage/`, `data/` eklenmesini istiyor ama üçü de mevcuttu (`.venv` satır 153, `data/` 223, `storage/` 226). `git check-ignore -v` ile doğrulandı, düzenleme yapılmadı |
+| **Bağımlılık sayısı** | `requirements.txt` 13 satır; overview "max 12" diyor. Çelişki değil: 3'ü geliştirme aracı (`pytest`, `pytest-cov`, `ruff`), **çalışma zamanı bağımlılığı 10** |
+| **Python 3.10.3 doğrulandı** | `str | None` union sözdizimi çalışıyor (3.10'dan itibaren geçerli). `tomllib`/`Self` kullanılamaz |
+| **Git satır sonu** | Git `LF → CRLF` uyarısı veriyor (Windows). Zararsız, `.gitattributes` gerekmedi |
 
 ---
 

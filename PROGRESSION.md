@@ -3,12 +3,12 @@
 > Bu dosya her fazın sonunda güncellenir. Oturum başında **önce burayı**, sonra
 > [MEMORY.md](MEMORY.md) dosyasını oku. Çalışma kuralları: [CLAUDE.md](CLAUDE.md).
 
-**Son güncelleme:** 2026-08-01
+**Son güncelleme:** 2026-08-02
 **Aktif bölüm:** Bölüm 1 — RAG Agent
-**Aktif task:** Task 1 — Proje iskeleti, config, veri modelleri (henüz başlamadı)
+**Aktif task:** Task 2 — Türkçe normalizasyon (henüz başlamadı)
 **Okunacak dosya:** [docs/superpowers/plans/rag-agent/00-overview.md](docs/superpowers/plans/rag-agent/00-overview.md)
-+ [01-skeleton-config-models.md](docs/superpowers/plans/rag-agent/01-skeleton-config-models.md)
-**Sıradaki somut adım:** Task 1 / Step 1 — klasör iskeletini oluştur ve 6 belgeyi `data/` altına kopyala
++ [02-normalize.md](docs/superpowers/plans/rag-agent/02-normalize.md)
+**Sıradaki somut adım:** Task 2 / Step 1 — `fold_tr` için kırmızı testi yaz
 
 > ⚠️ Aynı anda **tek** task dosyası okunur. Tüm task setini yüklemek gereksiz —
 > global kısıtlar overview'da, komşu task'ların imzaları kendi task'ının
@@ -21,7 +21,7 @@
 | Aşama | Durum |
 |---|---|
 | Planlama (case analizi, veri keşfi, PRD/TRD/task planları) | ✅ Tamamlandı — 2026-08-01 |
-| Bölüm 1 — RAG Agent | ⬜ Başlamadı (0/14 task) |
+| Bölüm 1 — RAG Agent | 🔄 Devam ediyor (1/14 task) |
 | Bölüm 2 — Satış Analizi | ⬜ Başlamadı (0/7 faz) — Bölüm 1 teslim edilebilir olmadan başlanmaz |
 
 Legend: ⬜ başlamadı · 🔄 devam ediyor · ✅ tamamlandı · ⚠️ engellendi
@@ -35,7 +35,7 @@ Kavramsal arka plan: [docs/bolum1-rag/UYGULAMA-PLANI.md](docs/bolum1-rag/UYGULAM
 
 | # | Task | Dosya | Durum | Testler | Commit |
 |---|---|---|---|---|---|
-| 1 | İskelet, config, modeller | [01](docs/superpowers/plans/rag-agent/01-skeleton-config-models.md) | ⬜ | — | — |
+| 1 | İskelet, config, modeller | [01](docs/superpowers/plans/rag-agent/01-skeleton-config-models.md) | ✅ | 6/6 ✅ %100 cov | `feat(config)` |
 | 2 | Türkçe normalizasyon | [02](docs/superpowers/plans/rag-agent/02-normalize.md) | ⬜ | — | — |
 | 3 | PDF loader ⚠️ | [03](docs/superpowers/plans/rag-agent/03-pdf-loader.md) | ⬜ | — | — |
 | 4 | DOCX loader (tablolar!) ⚠️ | [04](docs/superpowers/plans/rag-agent/04-docx-loader.md) | ⬜ | — | — |
@@ -185,6 +185,7 @@ Kavramsal arka plan (⚠️ uygulanmaz):
 
 Her faz kapandığında buraya bir satır eklenir.
 
-| Tarih | Bölüm | Faz | Commit | Test sonucu | Not |
+| Tarih | Bölüm | Task | Commit | Test sonucu | Not |
 |---|---|---|---|---|---|
 | 2026-08-01 | — | Planlama | — | — | PRD/TRD/planlar + CLAUDE.md/PROGRESSION/MEMORY oluşturuldu |
+| 2026-08-02 | 1 | Task 1 — İskelet, config, modeller | `feat(config)` | 6 passed, %100 cov | `.venv` kuruldu (13 paket), 6 belge `data/` altına kopyalandı |

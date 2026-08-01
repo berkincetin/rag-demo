@@ -158,6 +158,17 @@ Kodun bunlarla eşleşmesi beklenir; eşleşmiyorsa **önce kodu** sorgula.
 | **`getattr(p.style, "name", "")` savunması gerekli kaldı** | Tuzak #3'ün gerçekleştiği yer burası; `_style_name` olmadan `AttributeError` alınır |
 | **Entegrasyon testleri ilk çalıştırmada geçti** | Plan Step 3'te `load_docx` zaten yazılmış olduğu için Step 5 testleri RED aşaması görmedi. Bunu telafi etmek için tablo iddiasının anlamlılığı ayrı bir probe ile kanıtlandı (paragraphs-only metinde `1.500 TL/ay` yok). Task 5'te aynı desen tekrarlarsa aynı probe yaklaşımı uygulanmalı |
 
+### Task 5 — XLSX loader (2026-08-02)
+
+| Konu | Öğrenilen |
+|---|---|
+| **Başlık satırı üç sayfada aynı değil** | Plan "3 sayfanın da başlığı satır 2'de" diyor; ölçüm: `Genel SSS` → **2**, `IT Sistem Rehberi` → **2**, `Onboarding Kontrol Listesi` → **1**. Üçüncü sayfada alt başlık satırı yok, sadece tek başlık satırı var. `detect_header_row` üçünü de doğru buluyor — sabit `header=2` yazılsaydı üçüncü sayfa kayardı. Plandaki genelleme yanlış, kod doğru |
+| **`header=0` tuzağı kanıtlandı** | Naif okuma sütun adlarını `['TEKNOPARK YAZILIM A.S. — ...', 'Unnamed: 1', ...]` yapıyor; tespitli okuma `['#', 'Kategori', 'Alt Kategori', 'Soru & Cevap', ...]` veriyor. Tuzak #4 fiilen kapandı |
+| **Tespit sezgiseli: doluluk oranı** | `_MIN_FILL_RATIO = 0.6` — başlık satırı tüm sütunları doldurur (6/6), başlık/alt başlık satırları yalnız ilk hücreyi (1/6). İlk 10 satır taranır, en çok dolu olan kazanır |
+| **Bölüm sayıları** | Taksonomi: 101 ham satır → başlık 0 → tam **100** bölüm (ölçümle birebir). SSS: 15+12+18 = **45** bölüm |
+| **Kapsanmayan satırlar bilinçli** | `xlsx_loader.py` satır 50 (`raw.empty` → boş sayfa atlama) ve 58 (`text` boş → satır atlama) hiç tetiklenmiyor; korpusta boş sayfa/satır yok. %94 kapsam, eşiğin üstünde |
+| **Entegrasyon testleri yine ilk çalıştırmada geçti** | Task 4'teki desen tekrarlandı (plan Step 3 uygulamayı zaten yazdırıyor). Yine probe ile anlamlılık kanıtlandı — bu artık loader task'ları için standart adım |
+
 ---
 
 ## 5. Açık Sorular / Bekleyen Kararlar

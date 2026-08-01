@@ -26,11 +26,56 @@ already recorded in the PRDs; if you think something must be added, ask first.
 | [docs/00-case-analizi.md](docs/00-case-analizi.md) | Requirement traceability matrix — every case requirement → where it is satisfied |
 | [docs/01-veri-kesif-bulgulari.md](docs/01-veri-kesif-bulgulari.md) | **Measured** data findings. Not assumptions. Several of them change the implementation |
 | [docs/02-karar-kaydi.md](docs/02-karar-kaydi.md) | 10 ADRs — the "why" behind every technology choice |
-| [docs/bolum1-rag/](docs/bolum1-rag/) | Part 1 PRD, TRD, phase plan |
-| [docs/bolum2-analiz/](docs/bolum2-analiz/) | Part 2 PRD, TRD, phase plan |
+| [docs/bolum1-rag/](docs/bolum1-rag/) | Part 1 PRD (acceptance criteria), TRD (technical design). **Background, not the execution plan** |
+| [docs/bolum2-analiz/](docs/bolum2-analiz/) | Part 2 PRD, TRD. **Background, not the execution plan** |
+
+### 🚦 One execution source: the superpowers plan
+
+**Implementation follows `docs/superpowers/plans/` and nothing else.**
+
+`docs/bolum1-rag/UYGULAMA-PLANI.md` and `docs/bolum2-analiz/UYGULAMA-PLANI.md` are the
+earlier phase-narrative drafts. They explain *why* the work is sequenced the way it is and
+they are still worth reading for rationale — but they are **not** the plan you execute, and
+their step numbering is superseded. When the two disagree, the superpowers task file wins.
+
+Never work from `UYGULAMA-PLANI.md` steps. Never mix the two numbering schemes ("Faz 1.2"
+vs "Task 3 Step 2") in commits, PROGRESSION.md, or status reports — use task numbers.
+
+### The executable plan — read one task file at a time
+
+Part 1 is broken into **14 task files** under
+[docs/superpowers/plans/rag-agent/](docs/superpowers/plans/rag-agent/). Each task carries
+its own tests, implementation code, commands, and expected output — it is self-contained.
+
+**Reading rule:** read [00-overview.md](docs/superpowers/plans/rag-agent/00-overview.md)
+(100 lines: goal, global constraints, task sequence) plus **exactly one** task file
+(111–303 lines). Never load the whole task set — the constraints you need are in the
+overview, and the neighbouring task interfaces you need are in your own task's
+`Interfaces` block.
+
+`PROGRESSION.md` names which task file is current.
 
 The planning docs are written in Turkish. That is intentional — the user reads them.
 This file (CLAUDE.md) is in English.
+
+### Skills available in this repo
+
+The **superpowers** skill collection (v6.2.0, MIT, github.com/obra/superpowers) is
+installed project-locally at `.claude/skills/`. Invoke a skill with the Skill tool.
+
+| Skill | Use it when | Status here |
+|---|---|---|
+| `test-driven-development` | Before writing any implementation code | **Mandatory** — see §3 |
+| `verification-before-completion` | Before claiming anything is done, passing, or fixed | **Mandatory** — see §4 |
+| `systematic-debugging` | Any bug, test failure, or unexpected behaviour | **Mandatory** before proposing a fix |
+| `executing-plans` | Working through the task plan | **The execution path** — the plan lives in `docs/superpowers/plans/rag-agent/` |
+| `writing-plans` | Producing a new plan | Planning is done; use only if replanning |
+| `brainstorming` | Turning a vague idea into a spec | Planning is done; use only for new scope |
+| `requesting-code-review` / `receiving-code-review` | Reviewing a finished chunk of work | Optional, ask first (spawns a subagent) |
+| `subagent-driven-development`, `dispatching-parallel-agents` | Parallel/subagent execution | **Do not use** unless the user explicitly asks — this project runs single-threaded, phase by phase |
+| `using-git-worktrees`, `finishing-a-development-branch` | Branch isolation and merge flow | **Not applicable** — we commit straight to `main` (§5) |
+
+`.claude/` is gitignored, so these skills are not part of the delivery.
 
 ### State tracking — read at the start of every session
 
@@ -51,16 +96,33 @@ before the previous one is fully closed.
 For each phase:
 
 ```
-1. READ      PROGRESSION.md + MEMORY.md + the phase's section in the relevant UYGULAMA-PLANI.md
-2. IMPLEMENT the phase — only what that phase covers, nothing from later phases
-3. TEST      write unit tests AND integration tests for what the phase produced (see §3)
-4. VERIFY    run the full quality gate (see §4). All of it must pass
-5. UPDATE    PROGRESSION.md (mark phase done, set next step) and MEMORY.md (what you learned)
-6. COMMIT    conventional commit, then push to main (see §5)
-7. STOP      report what was done and ask for approval before starting the next phase
+1. READ      PROGRESSION.md + MEMORY.md + the plan overview + THIS TASK'S file only (see §1)
+2. INVOKE    Skill(skill="test-driven-development")     ← REQUIRED, before any code
+3. BUILD     work through the phase's steps in the RED→GREEN→REFACTOR cycle (§3) —
+             one step at a time, only what this phase covers, nothing from later phases
+4. INVOKE    Skill(skill="verification-before-completion")  ← REQUIRED, before any claim
+5. VERIFY    run the full quality gate (§4) and confirm the phase's DoD line by line
+6. UPDATE    PROGRESSION.md (mark phase done, set next step) and MEMORY.md (what you learned)
+7. COMMIT    conventional commit, then push to main (§5)
+8. STOP      report what was done and ask for approval before starting the next phase
 ```
 
-**Step 7 is a hard stop.** Do not chain phases. After pushing, summarize:
+Steps 2 and 4 are **actual `Skill` tool calls**, not a reminder to keep the idea in mind.
+Invoke them once per phase, at those points. Do not skip them because "I already know what
+TDD is" — the skill text is the contract, and re-reading it is what keeps the discipline
+from eroding over a long session.
+
+### Skill triggers — invoke when the situation appears
+
+| Situation | Invoke |
+|---|---|
+| About to write implementation code (any phase, any step) | `test-driven-development` |
+| About to say something is done / passing / fixed, or about to commit | `verification-before-completion` |
+| A test fails, a bug appears, or behaviour surprises you | `systematic-debugging` — **before** proposing a fix |
+| Starting a phase whose plan you are about to follow step by step | `executing-plans` (optional but recommended) |
+| The user asks for scope that isn't in the PRDs | `brainstorming` — before designing anything |
+
+**Step 8 is a hard stop.** Do not chain phases. After pushing, summarize:
 what was built, what the tests prove, anything that deviated from the plan, and what the
 next phase is. Then wait.
 
@@ -69,9 +131,42 @@ move on with a partially satisfied DoD, and do not quietly redefine the DoD.
 
 ---
 
-## 3. Testing requirements
+## 3. Testing requirements — TDD is mandatory
 
-Every phase produces both kinds of tests. A phase is not finished until they pass.
+**Invoke `Skill(skill="test-driven-development")` before the first line of code in each
+phase.** The summary below is not a substitute for the skill — it is a pointer to it.
+
+### The Iron Law
+
+```
+NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
+```
+
+Every step inside a phase follows **RED → GREEN → REFACTOR**:
+
+1. **RED** — write one minimal test for one behavior. Clear name, real code, no mocks
+   unless unavoidable.
+2. **Verify RED** — run it and **watch it fail**. This step is mandatory and cannot be
+   skipped. The failure must be "feature missing", not a typo or import error. If the test
+   passes immediately, it is testing existing behavior — fix the test.
+3. **GREEN** — write the simplest code that passes. No extra options, no anticipated
+   features, no "while I'm here" improvements.
+4. **Verify GREEN** — run it, see it pass, and confirm nothing else broke. Output must be
+   clean: no errors, no warnings.
+5. **REFACTOR** — only once green. Remove duplication, improve names. No new behavior.
+
+If production code was written before its test: **delete it and start over.** Do not keep
+it "as reference", do not adapt it while writing the test. That is testing-after wearing a
+disguise.
+
+Rationalizations that mean *stop and restart with TDD*: "too simple to test", "I'll test
+after", "already manually tested", "deleting it would waste the hour I spent",
+"TDD is dogmatic, I'm being pragmatic", "this case is different because…".
+
+**Bug fixes are TDD too:** write a failing test that reproduces the bug first, then fix.
+When a test fails or something behaves unexpectedly, invoke
+`Skill(skill="systematic-debugging")` **before** proposing a fix — root cause first,
+patch second.
 
 ### Unit tests
 Isolated, fast, deterministic, no network, no LLM calls. Test the logic the phase added.
@@ -103,9 +198,21 @@ glue) are excluded via `omit` in the coverage config — everything else counts.
 
 ---
 
-## 4. Quality gate
+## 4. Quality gate and verification
 
-Before any commit, all of these must pass:
+**Invoke `Skill(skill="verification-before-completion")` before claiming a phase is done
+and before every commit.**
+
+### The Iron Law
+
+```
+NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
+```
+
+If you have not run the command **in this message**, you cannot say it passes. Not
+"should pass", not "looks correct", not "done" — those are claims, and claims need output.
+
+Before any commit, run all of these and read the actual output:
 
 ```bash
 ruff format .                       # format
@@ -117,6 +224,28 @@ If any step fails: **do not commit**. Fix it. If it cannot be fixed, stop and re
 
 Never bypass hooks (`--no-verify`) and never lower the coverage threshold to make a
 commit go through.
+
+### Gate function — apply before every completion claim
+
+```
+1. IDENTIFY  which command proves this claim?
+2. RUN       the full command, fresh — not a remembered earlier run
+3. READ      full output, exit code, failure count
+4. VERIFY    does the output actually confirm the claim?
+5. ONLY THEN state the claim, together with its evidence
+```
+
+| Claim | What proves it | What does NOT prove it |
+|---|---|---|
+| "Tests pass" | pytest output showing 0 failures, now | An earlier run, "should pass" |
+| "Lint is clean" | `ruff check` exit 0 | A partial check, extrapolation |
+| "Phase 1 is done" | Every DoD line in the plan checked one by one | "Tests pass, so it's done" |
+| "The bug is fixed" | The test that reproduced it now passes | The code changed, so presumably |
+| "Ingest works" | `python scripts/ingest.py` ran and printed its summary | The unit tests pass |
+
+**Do not express satisfaction before verification.** No "Great!", "Perfect!", "Done!"
+ahead of the evidence. Report the phase's DoD as a line-by-line checklist, not as a
+general impression.
 
 ---
 
@@ -140,11 +269,12 @@ Scopes follow module names: `loaders`, `chunker`, `index`, `retriever`, `tools`,
 `notebook`, `progression`.
 
 Commit body: optional, one short paragraph if the change needs justification.
-End every commit message with:
 
-```
-Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
-```
+🚫 **No attribution trailers.** Do **not** append `Co-Authored-By: Claude ...`,
+`Generated with Claude Code`, or any similar footer to commit messages. This overrides the
+default Claude Code behaviour and applies to every commit in this repository. The commit
+message ends with its own content — nothing after it. The same applies to PR descriptions
+if any are ever created.
 
 > Note: the user's global instruction is "write the commit message, don't run git commit."
 > **This project overrides that** — the user explicitly asked for commit + push at the end

@@ -11,6 +11,24 @@
 
 ---
 
+## 0. Doküman Haritası — Hangisi Ne Zaman Okunur
+
+| Dosya | Ne zaman | Boyut |
+|---|---|---|
+| [CLAUDE.md](CLAUDE.md) | Her oturum başı — çalışma kuralları | ~340 satır |
+| [PROGRESSION.md](PROGRESSION.md) | Her oturum başı — aktif task ve sıradaki adım | ~180 satır |
+| **MEMORY.md** (bu dosya) | Her oturum başı — kararlar ve tuzaklar | ~120 satır |
+| [docs/superpowers/plans/rag-agent/00-overview.md](docs/superpowers/plans/rag-agent/00-overview.md) | 🚦 Her task başı — global kısıtlar | 100 satır |
+| `docs/superpowers/plans/rag-agent/NN-*.md` | 🚦 **Sadece aktif task'ınki** | 111–303 satır |
+| [docs/01-veri-kesif-bulgulari.md](docs/01-veri-kesif-bulgulari.md) | Bir test assertion'ı tutmadığında — ölçülmüş gerçekler burada | ~270 satır |
+| [docs/02-karar-kaydi.md](docs/02-karar-kaydi.md) | "Neden bu teknoloji?" sorusu çıkınca (10 ADR) | ~230 satır |
+| [docs/bolum1-rag/TRD.md](docs/bolum1-rag/TRD.md) | README'nin ASCII mimari diyagramı için (Task 14) | ~460 satır |
+| [docs/bolum1-rag/PRD.md](docs/bolum1-rag/PRD.md) | Kabul kriterleri ve 8 demo sorusu için (Task 14) | ~190 satır |
+| [docs/00-case-analizi.md](docs/00-case-analizi.md) | "Case bunu istiyor mu?" sorusunda — izlenebilirlik matrisi | ~100 satır |
+| `docs/bolum*/UYGULAMA-PLANI.md` | ⚠️ **Uygulanmaz** — sadece faz gerekçesi merak edilirse | — |
+
+---
+
 ## 1. Kesinleşmiş Kararlar
 
 Tam gerekçeler: [docs/02-karar-kaydi.md](docs/02-karar-kaydi.md)
@@ -29,10 +47,16 @@ Tam gerekçeler: [docs/02-karar-kaydi.md](docs/02-karar-kaydi.md)
 | Bölüm 2 yapısı | `src/analysis/` modülü + ince notebook | 2026-08-01 |
 | Tahmin modelleri | naive/snaive/ma3 + global LightGBM + MF ablasyonu, walk-forward | 2026-08-01 |
 | Git akışı | Doğrudan `main`, faz başına 1 commit + push, Conventional Commits | 2026-08-01 |
+| Commit imzası | 🚫 `Co-Authored-By` / `Generated with Claude Code` gibi hiçbir atıf satırı eklenmez | 2026-08-01 |
 | Kod dili | Bölüm 1 tamamen İngilizce (yorumlar dahil), Bölüm 2 Türkçe | 2026-08-01 |
 | Veri dosyaları | Git'e **commit edilmiyor** (`.gitignore`) — teslim ZIP'ine elle eklenecek | 2026-08-01 |
 | Kalite kapısı | ruff format + ruff check + pytest, min %70 coverage | 2026-08-01 |
-| Faz akışı | Her faz sonunda dur, onay iste — otomatik bir sonraki faza geçme | 2026-08-01 |
+| Geliştirme disiplini | **TDD zorunlu** (RED→GREEN→REFACTOR, testin başarısız olduğu görülmeden kod yazılmaz) + tamamlandı demeden önce kanıtlı doğrulama | 2026-08-01 |
+| Skill'ler | superpowers v6.2.0 (MIT) `.claude/skills/` altına proje-yerel kuruldu; `.claude/` gitignore'da, teslime dahil değil | 2026-08-01 |
+| Faz akışı | Her task sonunda dur, onay iste — otomatik bir sonraki task'a geçme | 2026-08-01 |
+| **Uygulama planı — tek kaynak** | 🚦 Kod **yalnızca** `docs/superpowers/plans/rag-agent/` altındaki 14 task dosyasından yazılır. `docs/bolum*/UYGULAMA-PLANI.md` dosyaları kavramsal arka plandır, **uygulanmaz**; çakışırlarsa superpowers task'ı kazanır | 2026-08-01 |
+| Plan okuma kuralı | `00-overview.md` (100 satır) + **tek** task dosyası (111–303 satır). Tüm task seti asla birlikte okunmaz — 3115 satırlık monolit bu yüzden bölündü | 2026-08-01 |
+| Bölüm 2 planı | Superpowers task planı Bölüm 1 bitince yazılacak; şimdi yazmak eşik kalibrasyonu gibi bilinmeyen çıktıları tahmine dayandırırdı | 2026-08-01 |
 
 ---
 

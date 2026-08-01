@@ -18,10 +18,30 @@ adım adım uygulama planlarını içerir.
 | [02-karar-kaydi.md](02-karar-kaydi.md) | Teknoloji/model seçimlerinin gerekçeleri (ADR formatı) — case "kararların gerekçelendirilebilmesi" istiyor |
 | [bolum1-rag/PRD.md](bolum1-rag/PRD.md) | RAG agent ürün gereksinimleri, kapsam, kabul kriterleri |
 | [bolum1-rag/TRD.md](bolum1-rag/TRD.md) | RAG agent teknik tasarımı: mimari, modüller, veri modeli, algoritmalar |
-| [bolum1-rag/UYGULAMA-PLANI.md](bolum1-rag/UYGULAMA-PLANI.md) | Faz faz, adım adım yapılacaklar + her adımın "bitti" tanımı |
 | [bolum2-analiz/PRD.md](bolum2-analiz/PRD.md) | Analiz projesi gereksinimleri ve teslim kriterleri |
 | [bolum2-analiz/TRD.md](bolum2-analiz/TRD.md) | Veri boru hattı, temizleme kuralları, metodoloji, modelleme tasarımı |
-| [bolum2-analiz/UYGULAMA-PLANI.md](bolum2-analiz/UYGULAMA-PLANI.md) | 7 analiz görevinin adım adım uygulama planı |
+
+## 🚦 Uygulama Planı — Tek Kaynak
+
+**Kod yazarken izlenen plan yalnızca budur:**
+
+| Dosya | İçerik |
+|---|---|
+| [superpowers/plans/rag-agent/00-overview.md](superpowers/plans/rag-agent/00-overview.md) | Bölüm 1'in amacı, global kısıtlar, 14 task'ın sırası ve bağımlılık zinciri |
+| [superpowers/plans/rag-agent/](superpowers/plans/rag-agent/) | Task 01–14: her biri kendi testi, kodu, komutu ve beklenen çıktısıyla bağımsız (111–303 satır) |
+| [superpowers/plans/rag-agent/99-verification-checklist.md](superpowers/plans/rag-agent/99-verification-checklist.md) | Teslim öncesi final kabul listesi |
+
+**Okuma kuralı:** `00-overview.md` + **tek** task dosyası. Tüm task seti asla birlikte okunmaz.
+
+> Bölüm 2'nin superpowers planı, Bölüm 1 tamamlandıktan sonra yazılacak
+> (eşik kalibrasyonu gibi henüz bilinmeyen çıktılara dayanmaması için).
+
+### Eski faz planları (kavramsal arka plan)
+
+| Dosya | Durum |
+|---|---|
+| [bolum1-rag/UYGULAMA-PLANI.md](bolum1-rag/UYGULAMA-PLANI.md) | ⚠️ **Uygulanmaz.** Faz anlatısı ve gerekçe için referans; adım numaraları superpowers task'ları tarafından geçersiz kılındı |
+| [bolum2-analiz/UYGULAMA-PLANI.md](bolum2-analiz/UYGULAMA-PLANI.md) | ⚠️ Aynı — Bölüm 2 için task planı yazılınca geçersiz kalacak |
 
 ## Temel Prensip
 

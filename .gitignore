@@ -227,3 +227,6 @@ storage/
 
 # Generated analysis figures
 figures/
+
+# Claude Code local config and project-scoped skills (superpowers, MIT — not part of delivery)
+.claude/

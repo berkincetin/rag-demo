@@ -5,9 +5,14 @@
 
 **Son güncelleme:** 2026-08-01
 **Aktif bölüm:** Bölüm 1 — RAG Agent
-**Aktif faz:** Faz 0 — Proje İskeleti (henüz başlamadı)
-**Sıradaki somut adım:** `docs/bolum1-rag/UYGULAMA-PLANI.md` → Faz 0, Adım 0.1
-(klasör yapısını oluştur)
+**Aktif task:** Task 1 — Proje iskeleti, config, veri modelleri (henüz başlamadı)
+**Okunacak dosya:** [docs/superpowers/plans/rag-agent/00-overview.md](docs/superpowers/plans/rag-agent/00-overview.md)
++ [01-skeleton-config-models.md](docs/superpowers/plans/rag-agent/01-skeleton-config-models.md)
+**Sıradaki somut adım:** Task 1 / Step 1 — klasör iskeletini oluştur ve 6 belgeyi `data/` altına kopyala
+
+> ⚠️ Aynı anda **tek** task dosyası okunur. Tüm task setini yüklemek gereksiz —
+> global kısıtlar overview'da, komşu task'ların imzaları kendi task'ının
+> `Interfaces` bloğunda.
 
 ---
 
@@ -15,8 +20,8 @@
 
 | Aşama | Durum |
 |---|---|
-| Planlama (case analizi, veri keşfi, PRD/TRD/planlar) | ✅ Tamamlandı — 2026-08-01 |
-| Bölüm 1 — RAG Agent | ⬜ Başlamadı (0/7 faz) |
+| Planlama (case analizi, veri keşfi, PRD/TRD/task planları) | ✅ Tamamlandı — 2026-08-01 |
+| Bölüm 1 — RAG Agent | ⬜ Başlamadı (0/14 task) |
 | Bölüm 2 — Satış Analizi | ⬜ Başlamadı (0/7 faz) — Bölüm 1 teslim edilebilir olmadan başlanmaz |
 
 Legend: ⬜ başlamadı · 🔄 devam ediyor · ✅ tamamlandı · ⚠️ engellendi
@@ -25,17 +30,37 @@ Legend: ⬜ başlamadı · 🔄 devam ediyor · ✅ tamamlandı · ⚠️ engell
 
 ## Bölüm 1 — RAG Agent
 
-Plan: [docs/bolum1-rag/UYGULAMA-PLANI.md](docs/bolum1-rag/UYGULAMA-PLANI.md)
+Plan: [docs/superpowers/plans/rag-agent/](docs/superpowers/plans/rag-agent/) — 14 task, her biri kendi commit'i ile kapanır.
+Kavramsal arka plan: [docs/bolum1-rag/UYGULAMA-PLANI.md](docs/bolum1-rag/UYGULAMA-PLANI.md) (faz anlatısı).
 
-| Faz | Ad | Durum | Testler | Commit | Not |
+| # | Task | Dosya | Durum | Testler | Commit |
 |---|---|---|---|---|---|
-| 0 | Proje İskeleti | ⬜ | — | — | |
-| 1 | Belge Yükleme (loaders) ⚠️ | ⬜ | — | — | En riskli faz |
-| 2 | Chunking ve İndeks | ⬜ | — | — | |
-| 3 | Retrieval 🎯 | ⬜ | — | — | Doğruluğun kaynağı |
-| 4 | LLM ve Agent | ⬜ | — | — | |
-| 5 | Arayüzler (CLI + Streamlit) | ⬜ | — | — | |
-| 6 | Demo, Docker, Dokümantasyon | ⬜ | — | — | |
+| 1 | İskelet, config, modeller | [01](docs/superpowers/plans/rag-agent/01-skeleton-config-models.md) | ⬜ | — | — |
+| 2 | Türkçe normalizasyon | [02](docs/superpowers/plans/rag-agent/02-normalize.md) | ⬜ | — | — |
+| 3 | PDF loader ⚠️ | [03](docs/superpowers/plans/rag-agent/03-pdf-loader.md) | ⬜ | — | — |
+| 4 | DOCX loader (tablolar!) ⚠️ | [04](docs/superpowers/plans/rag-agent/04-docx-loader.md) | ⬜ | — | — |
+| 5 | XLSX loader | [05](docs/superpowers/plans/rag-agent/05-xlsx-loader.md) | ⬜ | — | — |
+| 6 | Loader dispatch | [06](docs/superpowers/plans/rag-agent/06-loader-dispatch.md) | ⬜ | — | — |
+| 7 | Chunker + atıf etiketleri | [07](docs/superpowers/plans/rag-agent/07-chunker.md) | ⬜ | — | — |
+| 8 | İndeks + ingest | [08](docs/superpowers/plans/rag-agent/08-index-ingest.md) | ⬜ | — | — |
+| 9 | Hibrit retriever 🎯 | [09](docs/superpowers/plans/rag-agent/09-retriever.md) | ⬜ | — | — |
+| 10 | Tool'lar + promptlar | [10](docs/superpowers/plans/rag-agent/10-tools-prompts.md) | ⬜ | — | — |
+| 11 | LLM sağlayıcıları | [11](docs/superpowers/plans/rag-agent/11-llm-providers.md) | ⬜ | — | — |
+| 12 | Agent döngüsü + güvenlik ağı | [12](docs/superpowers/plans/rag-agent/12-agent.md) | ⬜ | — | — |
+| 13 | CLI + Streamlit | [13](docs/superpowers/plans/rag-agent/13-frontends.md) | ⬜ | — | — |
+| 14 | Demo, Docker, README | [14](docs/superpowers/plans/rag-agent/14-demo-docker-readme.md) | ⬜ | — | — |
+| — | Doğrulama listesi | [99](docs/superpowers/plans/rag-agent/99-verification-checklist.md) | ⬜ | — | — |
+
+**Bağımlılık zinciri:** 1 → 2 → {3, 4, 5} → 6 → 7 → 8 → 9 → {10, 11} → 12 → 13 → 14
+
+<details>
+<summary>⚠️ Eski faz bazlı kontrol listesi — UYGULANMAZ, sadece kavramsal referans</summary>
+
+> Bu liste superpowers task planından **önce** yazıldı. Adım numaraları (Faz 1.2 gibi)
+> geçersizdir; uygulama yalnızca yukarıdaki 14 task üzerinden yürür. Çakışma olursa
+> task dosyası kazanır. Burada tutulma sebebi: fazların **neden** bu sırada olduğunu
+> anlatan gerekçe.
+
 
 ### Faz Detay Kontrol Listeleri
 
@@ -86,12 +111,20 @@ Plan: [docs/bolum1-rag/UYGULAMA-PLANI.md](docs/bolum1-rag/UYGULAMA-PLANI.md)
 - [ ] 6.4 Teslim ZIP'i — ⚠️ `data/` git'te olmadığı için **elle eklenmeli**
 - [ ] Quality gate · [ ] Commit + push · [ ] Dosyalar güncellendi
 
+</details>
+
 ---
 
 ## Bölüm 2 — Satış Analizi
 
-Plan: [docs/bolum2-analiz/UYGULAMA-PLANI.md](docs/bolum2-analiz/UYGULAMA-PLANI.md)
-**Ön koşul:** Bölüm 1 Faz 6 tamamlanmış olmalı.
+**Plan durumu:** ⏳ Superpowers task planı **henüz yazılmadı.** Bölüm 1 (Task 14) bittikten
+sonra `docs/superpowers/plans/analiz/` altına yazılacak — şimdi yazmak, eşik kalibrasyonu
+gibi henüz bilinmeyen çıktıları tahmine dayandırırdı.
+
+Kavramsal arka plan (⚠️ uygulanmaz):
+[docs/bolum2-analiz/UYGULAMA-PLANI.md](docs/bolum2-analiz/UYGULAMA-PLANI.md)
+
+**Ön koşul:** Bölüm 1 Task 14 tamamlanmış olmalı.
 
 | Faz | Ad | Durum | Testler | Commit | Not |
 |---|---|---|---|---|---|

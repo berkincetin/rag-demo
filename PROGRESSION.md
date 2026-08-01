@@ -5,10 +5,10 @@
 
 **Son güncelleme:** 2026-08-02
 **Aktif bölüm:** Bölüm 1 — RAG Agent
-**Aktif task:** Task 4 — DOCX loader (başlık hiyerarşisi + tablolar) (henüz başlamadı)
+**Aktif task:** Task 5 — XLSX loader (otomatik başlık satırı tespiti) (henüz başlamadı)
 **Okunacak dosya:** [docs/superpowers/plans/rag-agent/00-overview.md](docs/superpowers/plans/rag-agent/00-overview.md)
-+ [04-docx-loader.md](docs/superpowers/plans/rag-agent/04-docx-loader.md)
-**Sıradaki somut adım:** Task 4 / Step 1 — `rows_to_markdown` için kırmızı testi yaz
++ [05-xlsx-loader.md](docs/superpowers/plans/rag-agent/05-xlsx-loader.md)
+**Sıradaki somut adım:** Task 5 / Step 1 — `detect_header_row` için kırmızı testi yaz
 
 > ⚠️ Aynı anda **tek** task dosyası okunur. Tüm task setini yüklemek gereksiz —
 > global kısıtlar overview'da, komşu task'ların imzaları kendi task'ının
@@ -21,7 +21,7 @@
 | Aşama | Durum |
 |---|---|
 | Planlama (case analizi, veri keşfi, PRD/TRD/task planları) | ✅ Tamamlandı — 2026-08-01 |
-| Bölüm 1 — RAG Agent | 🔄 Devam ediyor (3/14 task) |
+| Bölüm 1 — RAG Agent | 🔄 Devam ediyor (4/14 task) |
 | Bölüm 2 — Satış Analizi | ⬜ Başlamadı (0/7 faz) — Bölüm 1 teslim edilebilir olmadan başlanmaz |
 
 Legend: ⬜ başlamadı · 🔄 devam ediyor · ✅ tamamlandı · ⚠️ engellendi
@@ -38,7 +38,7 @@ Kavramsal arka plan: [docs/bolum1-rag/UYGULAMA-PLANI.md](docs/bolum1-rag/UYGULAM
 | 1 | İskelet, config, modeller | [01](docs/superpowers/plans/rag-agent/01-skeleton-config-models.md) | ✅ | 6/6 ✅ %100 cov | `feat(config)` |
 | 2 | Türkçe normalizasyon | [02](docs/superpowers/plans/rag-agent/02-normalize.md) | ✅ | 7/7 ✅ %100 cov | `feat(normalize)` |
 | 3 | PDF loader ⚠️ | [03](docs/superpowers/plans/rag-agent/03-pdf-loader.md) | ✅ | 5 unit + 3 integ ✅ | `feat(loaders)` |
-| 4 | DOCX loader (tablolar!) ⚠️ | [04](docs/superpowers/plans/rag-agent/04-docx-loader.md) | ⬜ | — | — |
+| 4 | DOCX loader (tablolar!) ⚠️ | [04](docs/superpowers/plans/rag-agent/04-docx-loader.md) | ✅ | 3 unit + 3 integ ✅ %100 cov | `feat(loaders)` |
 | 5 | XLSX loader | [05](docs/superpowers/plans/rag-agent/05-xlsx-loader.md) | ⬜ | — | — |
 | 6 | Loader dispatch | [06](docs/superpowers/plans/rag-agent/06-loader-dispatch.md) | ⬜ | — | — |
 | 7 | Chunker + atıf etiketleri | [07](docs/superpowers/plans/rag-agent/07-chunker.md) | ⬜ | — | — |
@@ -191,3 +191,4 @@ Her faz kapandığında buraya bir satır eklenir.
 | 2026-08-02 | 1 | Task 1 — İskelet, config, modeller | `feat(config)` | 6 passed, %100 cov | `.venv` kuruldu (13 paket), 6 belge `data/` altına kopyalandı |
 | 2026-08-02 | 1 | Task 2 — Türkçe normalizasyon | `feat(normalize)` | 13 passed, %100 cov | `fold_tr` gerçek korpusta doğrulandı: TR sorgu → ASCII DOCX eşleşiyor |
 | 2026-08-02 | 1 | Task 3 — PDF loader | `feat(loaders)` | 21 passed, %98 cov | Aksef 12s→20 bölüm, Duxet 24s→20 bölüm; 8+13 yanlış pozitif elendi |
+| 2026-08-02 | 1 | Task 4 — DOCX loader | `feat(loaders)` | 27 passed, %98,86 cov | Araç 54p/9 tablo→15 bölüm, İK 84p/7 tablo→19 bölüm; `1.500 TL/ay` sadece tablodan geliyor |

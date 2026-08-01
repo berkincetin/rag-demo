@@ -148,6 +148,16 @@ Kodun bunlarla eşleşmesi beklenir; eşleşmiyorsa **önce kodu** sorgula.
 | **Ölçülmüş gerçekler tuttu** | Aksef 12 sayfa, Duxet 24 sayfa — veri keşfiyle birebir. `4.3 Kontrendikasyonlar` → sayfa 3 doğrulandı, assertion değiştirilmedi |
 | **Kapsanmayan satırlar bilinçli** | `_one_section_per_page` fallback'i (satır 78, 87) hiç tetiklenmiyor — her iki PDF de bölüm numarası taşıyor. Coverage %98, eşiğin üstünde. Numarasız bir PDF gelirse devreye girecek |
 
+### Task 4 — DOCX loader (2026-08-02)
+
+| Konu | Öğrenilen |
+|---|---|
+| **Tablo tuzağı fiilen kanıtlandı** | `document.paragraphs` metninde `1.500 TL/ay` **yok**, `load_docx` çıktısında **var**. Yani entegrasyon testi gerçekten `_iter_block_items`'ı koruyor; tablo dalı kaldırılırsa test kırmızıya döner |
+| **Ölçülmüş gerçekler birebir tuttu** | `arac_kullanim_proseduru.docx`: 54 dolu paragraf, 9 tablo, 10× H1, 8× H2 → **15 bölüm**. `ik_surecleri_politikası.docx`: 84 dolu paragraf, 7 tablo, 8× H1, 16× H2 → **19 bölüm**. Veri keşfiyle uyumlu, hiçbir assertion değiştirilmedi |
+| **Başlık sayısı ≠ bölüm sayısı** | Araçta 10 H1 + 8 H2 = 18 açılan bölüm ama çıktı 15. Fark: metni boş kalan bölümler `if section.text` ile eleniyor (art arda gelen başlıklar, ör. H1'i hemen H2 izliyorsa H1 boş kalır). Bu kasıtlı — boş bölüm indekse girmemeli |
+| **`getattr(p.style, "name", "")` savunması gerekli kaldı** | Tuzak #3'ün gerçekleştiği yer burası; `_style_name` olmadan `AttributeError` alınır |
+| **Entegrasyon testleri ilk çalıştırmada geçti** | Plan Step 3'te `load_docx` zaten yazılmış olduğu için Step 5 testleri RED aşaması görmedi. Bunu telafi etmek için tablo iddiasının anlamlılığı ayrı bir probe ile kanıtlandı (paragraphs-only metinde `1.500 TL/ay` yok). Task 5'te aynı desen tekrarlarsa aynı probe yaklaşımı uygulanmalı |
+
 ---
 
 ## 5. Açık Sorular / Bekleyen Kararlar

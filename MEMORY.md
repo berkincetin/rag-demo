@@ -131,6 +131,14 @@ Kodun bunlarla eşleşmesi beklenir; eşleşmiyorsa **önce kodu** sorgula.
 | **Python 3.10.3 doğrulandı** | `str | None` union sözdizimi çalışıyor (3.10'dan itibaren geçerli). `tomllib`/`Self` kullanılamaz |
 | **Git satır sonu** | Git `LF → CRLF` uyarısı veriyor (Windows). Zararsız, `.gitattributes` gerekmedi |
 
+### Task 2 — Türkçe normalizasyon (2026-08-02)
+
+| Konu | Öğrenilen |
+|---|---|
+| **`fold_tr` gerçek veride doğrulandı** | Sentetik testlerin ötesinde canlı korpusla kontrol edildi: `fold_tr("İnsan Kaynakları")` → `insan kaynaklari`, ASCII'ye indirgenmiş DOCX metninde **bulunuyor**. Hiçbir belgede U+0307 kalıntısı yok. Tuzak #1 fiilen kapandı |
+| **Sıralama kritik** | Türkçe eşleme `casefold()`'dan **önce** çalışmalı. Aksi halde `İ` → `i` + U+0307 olur, kombine işaret NFKD'den sağ çıkar ve eşitlik bozulur. Test bunu açıkça koruyor (`"̇" not in fold_tr("İZİN")`) |
+| **`fold_tr` boşluk da sıkıştırır** | Sadece harf eşlemesi değil — `\s+` → tek boşluk + `strip()`. Yani arama metni tek satıra iner. `clean_text` ise **paragraf yapısını korur** (`\n\n`), ikisi farklı amaca hizmet eder |
+
 ---
 
 ## 5. Açık Sorular / Bekleyen Kararlar

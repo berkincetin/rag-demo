@@ -5,10 +5,13 @@
 
 **Son güncelleme:** 2026-08-02
 **Aktif bölüm:** Bölüm 1 — RAG Agent
-**Aktif task:** Task 11 — LLM sağlayıcıları (henüz başlamadı)
+**Aktif task:** Task 12 — Agent döngüsü + 3 katmanlı güvenlik ağı (henüz başlamadı)
 **Okunacak dosya:** [docs/superpowers/plans/rag-agent/00-overview.md](docs/superpowers/plans/rag-agent/00-overview.md)
-+ [11-llm-providers.md](docs/superpowers/plans/rag-agent/11-llm-providers.md)
-**Sıradaki somut adım:** Task 11 / Step 1 — `get_client` için kırmızı testi yaz
++ [12-agent.md](docs/superpowers/plans/rag-agent/12-agent.md)
+**Sıradaki somut adım:** Task 12 / Step 1 — `extract_citations` için kırmızı testi yaz
+
+> 🚨 **Task 12'yi etkileyen ölçüm:** qwen2.5-7b, mevcut `SYSTEM_PROMPT` ile tool
+> **çağırmıyor** (promptsuz çağırıyor). Detay ve kanıt MEMORY.md Task 11.
 
 > ⚠️ **Eşik değerleri değişti:** `MIN_COSINE=0.72` **geçersiz**. Kalibre edilmiş değerler
 > `MIN_COSINE=0.80` + `MIN_BM25=5.0` (VE kapısı). Gerekçe ve ölçüm tablosu MEMORY.md Task 9.
@@ -24,7 +27,7 @@
 | Aşama | Durum |
 |---|---|
 | Planlama (case analizi, veri keşfi, PRD/TRD/task planları) | ✅ Tamamlandı — 2026-08-01 |
-| Bölüm 1 — RAG Agent | 🔄 Devam ediyor (10/14 task) |
+| Bölüm 1 — RAG Agent | 🔄 Devam ediyor (11/14 task) |
 | Bölüm 2 — Satış Analizi | ⬜ Başlamadı (0/7 faz) — Bölüm 1 teslim edilebilir olmadan başlanmaz |
 
 Legend: ⬜ başlamadı · 🔄 devam ediyor · ✅ tamamlandı · ⚠️ engellendi
@@ -48,7 +51,7 @@ Kavramsal arka plan: [docs/bolum1-rag/UYGULAMA-PLANI.md](docs/bolum1-rag/UYGULAM
 | 8 | İndeks + ingest | [08](docs/superpowers/plans/rag-agent/08-index-ingest.md) | ✅ | 4 integ ✅ %100 cov | `feat(index)` |
 | 9 | Hibrit retriever 🎯 | [09](docs/superpowers/plans/rag-agent/09-retriever.md) | ✅ | 8 unit + 7 integ ✅ %100 cov | `feat(retriever)` |
 | 10 | Tool'lar + promptlar | [10](docs/superpowers/plans/rag-agent/10-tools-prompts.md) | ✅ | 10 unit ✅ %94 cov | `feat(tools)` |
-| 11 | LLM sağlayıcıları | [11](docs/superpowers/plans/rag-agent/11-llm-providers.md) | ⬜ | — | — |
+| 11 | LLM sağlayıcıları | [11](docs/superpowers/plans/rag-agent/11-llm-providers.md) | ✅ | 6 unit + 2 skip (SDK yok) ✅ | `feat(llm)` |
 | 12 | Agent döngüsü + güvenlik ağı | [12](docs/superpowers/plans/rag-agent/12-agent.md) | ⬜ | — | — |
 | 13 | CLI + Streamlit | [13](docs/superpowers/plans/rag-agent/13-frontends.md) | ⬜ | — | — |
 | 14 | Demo, Docker, README | [14](docs/superpowers/plans/rag-agent/14-demo-docker-readme.md) | ⬜ | — | — |
@@ -201,3 +204,4 @@ Her faz kapandığında buraya bir satır eklenir.
 | 2026-08-02 | 1 | Task 8 — İndeks + ingest | `feat(index)` | 56 passed, %98,54 cov | `ingest.py` gerçek korpusta çalıştı: 219 bölüm → **276 chunk, 50,5s**. e5-base indirildi (~1,1 GB) |
 | 2026-08-02 | 1 | Task 9 — Hibrit retriever | `feat(retriever)` | 75 passed, %98,80 cov | 3 kök neden düzeltildi: başlıklar `search_text`'e, `bm25_tokens` (6 karakter), eşik **0,80 + BM25 5,0 (VE)**. 7/7 probe ✅ |
 | 2026-08-02 | 1 | Task 10 — Tool'lar + promptlar | `feat(tools)` | 85 passed, %97,80 cov | 3 tool + Türkçe sistem promptu; `prompts.py` Task 12'de kapsanacak |
+| 2026-08-02 | 1 | Task 11 — LLM sağlayıcıları | `feat(llm)` | 91 passed + 2 skipped, %97,80 cov | Ollama smoke test ✅ ("Merhaba!"). ⚠️ Yerel etiket `-q4_K_M`; SYSTEM_PROMPT tool çağrısını engelliyor (Task 12'ye devredildi) |

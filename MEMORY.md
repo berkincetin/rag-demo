@@ -260,6 +260,22 @@ belgede yok) da doğru şekilde eleniyor (kosinüs 0,778).
 | **Eşik değiştikçe yeniden ingest gerekiyor** | `search_text` veya `bm25_tokens` değişirse indeks bayatlar. Task 9'da 3 kez yeniden ingest edildi (~55–62s). Ölçüm yaparken bunu unutma |
 | **RRF sıralamayı dense'ten devralmıyor** | 4.3 en yüksek kosinüse sahipken (0,828) bile BM25 desteği olmadan 3. sıraya düşüyordu. RRF **sıra** birleştirir, skor değil — bir ranker tamamen kör kalırsa fusion onu kurtarmaz |
 
+### Task 10 — Tool'lar + promptlar (2026-08-02)
+
+| Konu | Öğrenilen |
+|---|---|
+| **Sorunsuz geçti** | 10 birim testi, plandan sapma yok. Tool çıktısı `[1]`, `[2]` diye numaralı — Task 12'nin atıf post-check'i bu numaraları gerçek kaynaklarla eşleştirecek |
+| **`prompts.py` kapsam dışı görünüyor** | Sadece sabit string'ler, hiçbir test import etmiyor → %0. Task 12'de agent import edince kapsanacak. Yapay test yazılmadı |
+
+### Task 11 — LLM sağlayıcıları (2026-08-02)
+
+| Konu | Öğrenilen |
+|---|---|
+| **Ollama model etiketi farklı** | Bu makinede `qwen2.5:7b-instruct` **yok**, `qwen2.5:7b-instruct-q4_K_M` var. Düz etiketle `/api/chat` **404** veriyor. Yerelde `.env` içinde `LLM_MODEL=qwen2.5:7b-instruct-q4_K_M` gerekiyor; `config.py` varsayılanı kanonik etiket olarak bırakıldı (değerlendirici `ollama pull qwen2.5:7b-instruct` ile tam onu alır) |
+| **Bulut SDK'ları kurulu değil** | `anthropic` ve `openai` `requirements.txt`'te yok (ADR-007: varsayılan Ollama). Yönlendirme testleri `pytest.importorskip` ile koşullu atlanıyor — bu, "testi geçirmek için skip" değil, planın Step 4'ünün açıkça izin verdiği durum. Yönlendirme mantığı ayrıca SDK'sız da test ediliyor (`ModuleNotFoundError` = doğru constructor'a ulaşıldı, `ValueError` = yönlendirme hatası) |
+| **CPU'da 7B yavaş** | Tek tool-calling isteği ~60–75 saniye. 4 senaryoluk probe 300s timeout'u aştı. Task 12/14'te LLM çağıran her adım için bunu hesaba kat — demo notebook'u dakikalar sürecek |
+| 🚨 **SYSTEM_PROMPT tool çağrısını engelliyor** | Ölçüldü: sistem promptu **olmadan** model `search_documents`'i çağırıyor; **mevcut SYSTEM_PROMPT ile çağırmıyor**, doğrudan genel bilgiden cevap veriyor. Sebep: Kural 3 ("araçlardan gelen içerikte cevap yoksa 'bilgi bulamadım' de") modele daha 1. turda kullanabileceği bir kaçış yolu veriyor ve qwen2.5-7b onu kullanıyor. Prompt'a "önce aracı çağır" eklemek **düzeltmedi**. **Task 12 bunu çözmek zorunda** — muhtemelen bağlamı agent'ın kendisi önceden çekmeli (skor kapısı zaten LLM'den önce çalışıyor), modelin tool çağırma inisiyatifine güvenilmemeli |
+
 ---
 
 ## 5. Açık Sorular / Bekleyen Kararlar

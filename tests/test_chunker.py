@@ -97,7 +97,26 @@ def test_spreadsheet_rows_are_never_split_even_when_long():
 def test_chunk_search_text_is_ascii_folded():
     chunks = chunk_sections([_pdf_section("İnsan Kaynakları")])
 
-    assert chunks[0].search_text == "insan kaynaklari"
+    assert "insan kaynaklari" in chunks[0].search_text
+    assert chunks[0].search_text == chunks[0].search_text.casefold()
+
+
+def test_search_text_includes_the_section_heading():
+    # "Kontrendikasyonlar" is the title of KUB section 4.3 but never appears in
+    # its body, so a query naming the section can only match via the heading.
+    section = RawSection(
+        source_file="Aksef.pdf",
+        doc_type="pdf",
+        text="Sefuroksime aşırı duyarlılığı olanlarda kullanılmamalıdır.",
+        section_id="4.3",
+        section_title="Kontrendikasyonlar",
+        page_start=3,
+    )
+
+    chunk = chunk_sections([section])[0]
+
+    assert "kontrendikasyonlar" in chunk.search_text
+    assert "Kontrendikasyonlar" not in chunk.text  # display text stays as loaded
 
 
 def test_chunk_ids_are_unique_across_sections():

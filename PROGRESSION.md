@@ -5,10 +5,13 @@
 
 **Son güncelleme:** 2026-08-02
 **Aktif bölüm:** Bölüm 1 — RAG Agent
-**Aktif task:** Task 9 — Hibrit retriever (henüz başlamadı)
+**Aktif task:** Task 10 — Tool'lar + promptlar (henüz başlamadı)
 **Okunacak dosya:** [docs/superpowers/plans/rag-agent/00-overview.md](docs/superpowers/plans/rag-agent/00-overview.md)
-+ [09-retriever.md](docs/superpowers/plans/rag-agent/09-retriever.md)
-**Sıradaki somut adım:** Task 9 / Step 1 — `reciprocal_rank_fusion` için kırmızı testi yaz
++ [10-tools-prompts.md](docs/superpowers/plans/rag-agent/10-tools-prompts.md)
+**Sıradaki somut adım:** Task 10 / Step 1 — `TOOL_SCHEMAS` için kırmızı testi yaz
+
+> ⚠️ **Eşik değerleri değişti:** `MIN_COSINE=0.72` **geçersiz**. Kalibre edilmiş değerler
+> `MIN_COSINE=0.80` + `MIN_BM25=5.0` (VE kapısı). Gerekçe ve ölçüm tablosu MEMORY.md Task 9.
 
 > ⚠️ Aynı anda **tek** task dosyası okunur. Tüm task setini yüklemek gereksiz —
 > global kısıtlar overview'da, komşu task'ların imzaları kendi task'ının
@@ -21,7 +24,7 @@
 | Aşama | Durum |
 |---|---|
 | Planlama (case analizi, veri keşfi, PRD/TRD/task planları) | ✅ Tamamlandı — 2026-08-01 |
-| Bölüm 1 — RAG Agent | 🔄 Devam ediyor (8/14 task) |
+| Bölüm 1 — RAG Agent | 🔄 Devam ediyor (9/14 task) |
 | Bölüm 2 — Satış Analizi | ⬜ Başlamadı (0/7 faz) — Bölüm 1 teslim edilebilir olmadan başlanmaz |
 
 Legend: ⬜ başlamadı · 🔄 devam ediyor · ✅ tamamlandı · ⚠️ engellendi
@@ -43,7 +46,7 @@ Kavramsal arka plan: [docs/bolum1-rag/UYGULAMA-PLANI.md](docs/bolum1-rag/UYGULAM
 | 6 | Loader dispatch | [06](docs/superpowers/plans/rag-agent/06-loader-dispatch.md) | ✅ | 2 unit + 3 integ ✅ %100 cov | `feat(loaders)` |
 | 7 | Chunker + atıf etiketleri | [07](docs/superpowers/plans/rag-agent/07-chunker.md) | ✅ | 11 unit + 3 integ ✅ %98 cov | `feat(chunker)` |
 | 8 | İndeks + ingest | [08](docs/superpowers/plans/rag-agent/08-index-ingest.md) | ✅ | 4 integ ✅ %100 cov | `feat(index)` |
-| 9 | Hibrit retriever 🎯 | [09](docs/superpowers/plans/rag-agent/09-retriever.md) | ⬜ | — | — |
+| 9 | Hibrit retriever 🎯 | [09](docs/superpowers/plans/rag-agent/09-retriever.md) | ✅ | 8 unit + 7 integ ✅ %100 cov | `feat(retriever)` |
 | 10 | Tool'lar + promptlar | [10](docs/superpowers/plans/rag-agent/10-tools-prompts.md) | ⬜ | — | — |
 | 11 | LLM sağlayıcıları | [11](docs/superpowers/plans/rag-agent/11-llm-providers.md) | ⬜ | — | — |
 | 12 | Agent döngüsü + güvenlik ağı | [12](docs/superpowers/plans/rag-agent/12-agent.md) | ⬜ | — | — |
@@ -196,3 +199,4 @@ Her faz kapandığında buraya bir satır eklenir.
 | 2026-08-02 | 1 | Task 6 — Loader dispatch | `feat(loaders)` | 38 passed, %98,25 cov | 6 dosya → **219 bölüm / 144.365 karakter**; Türkçe dosya adı glob ile bulundu |
 | 2026-08-02 | 1 | Task 7 — Chunker | `feat(chunker)` | 52 passed, %98,26 cov | ⚠️ Plandaki `_split_text` hatalıydı: 232 chunk (12'si 1200 sınırı üstü, max 9.681). `_hard_split` eklendi → **276 chunk, sınır aşımı 0** |
 | 2026-08-02 | 1 | Task 8 — İndeks + ingest | `feat(index)` | 56 passed, %98,54 cov | `ingest.py` gerçek korpusta çalıştı: 219 bölüm → **276 chunk, 50,5s**. e5-base indirildi (~1,1 GB) |
+| 2026-08-02 | 1 | Task 9 — Hibrit retriever | `feat(retriever)` | 75 passed, %98,80 cov | 3 kök neden düzeltildi: başlıklar `search_text`'e, `bm25_tokens` (6 karakter), eşik **0,80 + BM25 5,0 (VE)**. 7/7 probe ✅ |

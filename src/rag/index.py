@@ -12,6 +12,7 @@ import chromadb
 from rank_bm25 import BM25Okapi
 
 from src.rag.models import Chunk
+from src.rag.normalize import bm25_tokens
 
 COLLECTION_NAME = "documents"
 _BATCH_SIZE = 64
@@ -71,7 +72,7 @@ def build_index(
             metadatas=[chunk.metadata for chunk in batch],
         )
 
-    bm25 = BM25Okapi([chunk.search_text.split() for chunk in chunks])
+    bm25 = BM25Okapi([bm25_tokens(chunk.search_text) for chunk in chunks])
     (storage_dir / "bm25.pkl").write_bytes(pickle.dumps(bm25))
 
     with (storage_dir / "chunks.jsonl").open("w", encoding="utf-8") as handle:

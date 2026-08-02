@@ -28,6 +28,7 @@ _TURKISH_MAP = str.maketrans(
 _WHITESPACE = re.compile(r"\s+")
 _TRAILING_SPACES = re.compile(r"[ \t]+$", re.MULTILINE)
 _EXTRA_BLANK_LINES = re.compile(r"\n{3,}")
+_TOKEN_PREFIX = 6
 
 
 def fold_tr(text: str) -> str:
@@ -40,6 +41,18 @@ def fold_tr(text: str) -> str:
     decomposed = unicodedata.normalize("NFKD", mapped)
     stripped = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
     return _WHITESPACE.sub(" ", stripped.casefold()).strip()
+
+
+def bm25_tokens(text: str) -> list[str]:
+    """Tokenize for BM25, truncating each token to its first characters.
+
+    Turkish is agglutinative: a question asks about "kontrendikasyonları"
+    while the heading reads "Kontrendikasyonlar". BM25 matches tokens
+    exactly, so without truncation the two never meet. Six characters was
+    measured against the demo query set as the length that unifies suffixed
+    forms without merging distinct words.
+    """
+    return [token[:_TOKEN_PREFIX] for token in fold_tr(text).split()]
 
 
 def clean_text(text: str) -> str:

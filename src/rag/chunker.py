@@ -29,6 +29,20 @@ def _slug(value: str) -> str:
     return _NON_WORD.sub("-", fold_tr(value)).strip("-")[:40]
 
 
+def _search_heading(section: RawSection) -> str:
+    """Heading words to prepend to the search field, never to the display text.
+
+    A KUB section titled "Kontrendikasyonlar" does not repeat that word in its
+    body, so a query naming the section can only match through its heading.
+    """
+    parts = [section.section_id, section.section_title, section.section_path, section.sheet]
+    seen: list[str] = []
+    for part in parts:
+        if part and part not in seen:
+            seen.append(part)
+    return " ".join(seen)
+
+
 def _metadata(section: RawSection, chunk_index: int, char_count: int) -> dict[str, Any]:
     """Chroma metadata values must be scalars; None is not allowed."""
     return {
@@ -114,12 +128,13 @@ def chunk_sections(
         )
         base = _slug(section.source_file)
         marker = _slug(section.section_id or section.section_path or str(section.row or position))
+        heading = _search_heading(section)
         for index, piece in enumerate(pieces):
             chunks.append(
                 Chunk(
                     chunk_id=f"{base}__{marker}__{position}__{index}",
                     text=piece,
-                    search_text=fold_tr(piece),
+                    search_text=fold_tr(f"{heading} {piece}" if heading else piece),
                     citation_label=build_citation_label(section),
                     metadata=_metadata(section, index, len(piece)),
                 )

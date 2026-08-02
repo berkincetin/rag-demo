@@ -18,6 +18,7 @@ class Config:
     chunk_overlap: int
     top_k: int
     min_cosine: float
+    min_bm25: float
     max_tool_turns: int
     llm_provider: str
     llm_model: str
@@ -33,7 +34,9 @@ class Config:
             chunk_max_chars=int(os.getenv("CHUNK_MAX_CHARS", "1200")),
             chunk_overlap=int(os.getenv("CHUNK_OVERLAP", "150")),
             top_k=int(os.getenv("TOP_K", "5")),
-            min_cosine=float(os.getenv("MIN_COSINE", "0.72")),
+            # Calibrated in Task 9 against the demo question set; see MEMORY.md.
+            min_cosine=float(os.getenv("MIN_COSINE", "0.80")),
+            min_bm25=float(os.getenv("MIN_BM25", "5.0")),
             max_tool_turns=int(os.getenv("MAX_TOOL_TURNS", "3")),
             llm_provider=os.getenv("LLM_PROVIDER", "ollama"),
             llm_model=os.getenv("LLM_MODEL", "qwen2.5:7b-instruct"),

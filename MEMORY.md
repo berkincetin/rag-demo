@@ -202,6 +202,64 @@ Kodun bunlarla eşleşmesi beklenir; eşleşmiyorsa **önce kodu** sorgula.
 | **`chunks.jsonl` = tek gerçek kaynağı** | Chunk metni/atıf etiketi hem Chroma'da hem JSONL'de. Retriever JSONL'i okuyor, Chroma yalnız vektör araması için. `Chunk(**json.loads(line))` round-trip çalışıyor |
 | **Pydantic uyarısı** | `chromadb` 50 adet `PydanticDeprecatedSince211` uyarısı üretiyor. Kütüphane içi, bizim kodla ilgisi yok |
 
+### Task 9 — Hibrit retriever ve eşik kalibrasyonu (2026-08-02)
+
+Bu task'ta **üç ayrı kök neden** bulundu ve düzeltildi. Üçü de ölçümle tespit edildi.
+
+#### 1. Bölüm başlıkları aranabilir değildi (chunker düzeltmesi)
+
+KÜB bölüm 4.3'ün **başlığı** "Kontrendikasyonlar" ama bu kelime **gövde metninde hiç geçmiyor**.
+`search_text` sadece gövdeydi → ne BM25 ne dense o bölümü ayırt edebiliyordu; "Aksef
+kontrendikasyonları" sorgusunda 4.3 üçüncü sıradaydı. Çözüm: `_search_heading()` —
+`section_id + section_title + section_path + sheet` **yalnız `search_text`'e** ekleniyor,
+görüntülenen `text` değişmiyor. Yan fayda: "Havuz aracı nasıl talep edilir?" artık doğrudan
+`4.1 Havuz Araç` bölümünü buluyor (önce genel `3. ARAÇ TAHSİS` geliyordu).
+
+#### 2. BM25 Türkçe eklerde eşleşmiyordu (`bm25_tokens`)
+
+Başlık eklendikten **sonra bile** 4.3'ün BM25 skoru 0,00 kaldı. Sebep: sorgu tokenı
+`kontrendikasyonlari`, indeks tokenı `kontrendikasyonlar` — BM25 tam eşleşme yapar,
+Türkçe eklemeli dilde bu asla tutmaz. Çözüm: `bm25_tokens()` — tokenlar **ilk 6 karaktere**
+kırpılıyor (sabit uzunlukta kırpma kökleştirme, Türkçe bilgi erişiminde standart yöntem,
+yeni bağımlılık gerektirmez). Ölçüm — demo sorgu setinde doğru ilk sonuç sayısı:
+
+| Önek uzunluğu | Sonuç |
+|---|---|
+| kırpma yok | Aksef 4.3 ✗ · Duxet 4.6 ✓ |
+| 5 | Aksef 4.3 ✗ · Duxet 4.6 ✓ |
+| **6 (seçilen)** | **Aksef 4.3 ✓ · Duxet 4.6 ✓** |
+| 7 | Aksef 4.3 ✓ · Duxet 4.6 ✗ |
+| 8 | Aksef 4.3 ✓ · Duxet 4.6 ✓ (6'dan zayıf) |
+
+Sonuç: 4.3'ün BM25 skoru 0,00 → **8,31**, sıralamada 3. → **1.**
+
+#### 3. Güven eşiği: tek sinyal ayırt edemiyor (VEYA → VE)
+
+Planın `MIN_COSINE=0.72` değeri e5 için **çok düşük**: e5 kosinüsü dar bir banda sıkıştırıyor,
+konu dışı sorular bile 0,75–0,81 alıyor. Ölçülen dağılım (10 geçerli soru, 6 konu dışı):
+
+| | kosinüs (ilk sonuç) | BM25 (ilk sonuç) |
+|---|---|---|
+| **Geçerli sorular** | 0,811 – 0,874 | 7,51 – 21,55 |
+| **Konu dışı sorular** | 0,746 – **0,813** | 0,00 – **8,25** |
+
+🚨 **Bantlar çakışıyor.** Konu dışı "Bana bir şiir yaz" kosinüs **0,813** alıyor — en zayıf
+geçerli soru olan "OPS-PRO-003"ün (**0,811**) üstünde. Konu dışı "En sevdiğin film hangisi?"
+BM25 **8,25** alıyor — birçok geçerli sorunun üstünde. Yani **VEYA kapısı bu veride matematiksel
+olarak imkânsız**: kosinüs eşiği 0,813'ün üstünde olmalı, ama o zaman geçerli sorular için
+BM25 eşiği ≤ 7,55 olmalı, o da 8,25'lik konu dışı soruyu içeri alır.
+
+**Karar: iki sinyalin de aynı anda desteklemesi (VE kapısı).**
+`MIN_COSINE = 0.80` **ve** `MIN_BM25 = 5.0` → 10 geçerli sorunun **10'u** geçiyor,
+6 konu dışı sorunun **6'sı** eleniyor. PRD 8a ("Şirketin 2027 kâr hedefi" — alan içi ama
+belgede yok) da doğru şekilde eleniyor (kosinüs 0,778).
+
+| Konu | Öğrenilen |
+|---|---|
+| **Eşik değerleri değişti** | Overview'daki `MIN_COSINE=0.72` **artık geçerli değil**; `0.80` + yeni `MIN_BM25=5.0`. `config.py` ve `test_config.py` güncellendi. README'ye bu tablo girecek |
+| **Eşik değiştikçe yeniden ingest gerekiyor** | `search_text` veya `bm25_tokens` değişirse indeks bayatlar. Task 9'da 3 kez yeniden ingest edildi (~55–62s). Ölçüm yaparken bunu unutma |
+| **RRF sıralamayı dense'ten devralmıyor** | 4.3 en yüksek kosinüse sahipken (0,828) bile BM25 desteği olmadan 3. sıraya düşüyordu. RRF **sıra** birleştirir, skor değil — bir ranker tamamen kör kalırsa fusion onu kurtarmaz |
+
 ---
 
 ## 5. Açık Sorular / Bekleyen Kararlar

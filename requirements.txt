@@ -8,6 +8,9 @@ openpyxl==3.1.5
 streamlit==1.41.1
 python-dotenv==1.0.1
 requests==2.32.3
+
+# Geliştirme ve demo araçları (çalışma zamanı bağımlılığı değil)
 pytest==8.3.4
 pytest-cov==6.0.0
 ruff==0.8.4
+jupyter==1.1.1

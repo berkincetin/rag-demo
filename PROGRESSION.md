@@ -5,10 +5,9 @@
 
 **Son güncelleme:** 2026-08-02
 **Aktif bölüm:** Bölüm 1 — RAG Agent
-**Aktif task:** Task 14 — Demo notebook, Docker, README (henüz başlamadı)
-**Okunacak dosya:** [docs/superpowers/plans/rag-agent/00-overview.md](docs/superpowers/plans/rag-agent/00-overview.md)
-+ [14-demo-docker-readme.md](docs/superpowers/plans/rag-agent/14-demo-docker-readme.md)
-**Sıradaki somut adım:** Task 14 / Step 1 — `notebooks/demo.ipynb` 8 senaryoyla oluştur
+**Aktif bölüm:** Bölüm 1 **tamamlandı** (14/14 task) — Bölüm 2 planlaması bekliyor
+**Sıradaki somut adım:** Teslim ZIP'i (`data/` elle eklenerek) → sonra Bölüm 2 superpowers
+planı `docs/superpowers/plans/analiz/` altına yazılacak
 
 > ⚠️ **Eşik değerleri değişti:** `MIN_COSINE=0.72` **geçersiz**. Kalibre edilmiş değerler
 > `MIN_COSINE=0.80` + `MIN_BM25=5.0` (VE kapısı). Gerekçe ve ölçüm tablosu MEMORY.md Task 9.
@@ -24,7 +23,7 @@
 | Aşama | Durum |
 |---|---|
 | Planlama (case analizi, veri keşfi, PRD/TRD/task planları) | ✅ Tamamlandı — 2026-08-01 |
-| Bölüm 1 — RAG Agent | 🔄 Devam ediyor (13/14 task) |
+| Bölüm 1 — RAG Agent | ✅ Tamamlandı — 2026-08-02 (14/14 task) |
 | Bölüm 2 — Satış Analizi | ⬜ Başlamadı (0/7 faz) — Bölüm 1 teslim edilebilir olmadan başlanmaz |
 
 Legend: ⬜ başlamadı · 🔄 devam ediyor · ✅ tamamlandı · ⚠️ engellendi
@@ -51,8 +50,25 @@ Kavramsal arka plan: [docs/bolum1-rag/UYGULAMA-PLANI.md](docs/bolum1-rag/UYGULAM
 | 11 | LLM sağlayıcıları | [11](docs/superpowers/plans/rag-agent/11-llm-providers.md) | ✅ | 6 unit + 2 skip (SDK yok) ✅ | `feat(llm)` |
 | 12 | Agent döngüsü + güvenlik ağı | [12](docs/superpowers/plans/rag-agent/12-agent.md) | ✅ | 7 unit ✅ %100 cov + uçtan uca | `feat(agent)` |
 | 13 | CLI + Streamlit | [13](docs/superpowers/plans/rag-agent/13-frontends.md) | ✅ | 3 unit ✅ + CLI & UI elle doğrulandı | `feat(cli)` |
-| 14 | Demo, Docker, README | [14](docs/superpowers/plans/rag-agent/14-demo-docker-readme.md) | ⬜ | — | — |
-| — | Doğrulama listesi | [99](docs/superpowers/plans/rag-agent/99-verification-checklist.md) | ⬜ | — | — |
+| 14 | Demo, Docker, README | [14](docs/superpowers/plans/rag-agent/14-demo-docker-readme.md) | ✅ | notebook 9 senaryo, 0 hata | `docs` |
+| — | Doğrulama listesi | [99](docs/superpowers/plans/rag-agent/99-verification-checklist.md) | ✅ | 11/12 ✅, 1 kısmi (aşağıda) | — |
+
+### Doğrulama listesi sonucu
+
+| Madde | Durum |
+|---|---|
+| `pip install -r requirements.txt` temiz venv'de çalışıyor | ✅ exit 0 |
+| `ingest.py` 6 belgeyi işliyor, chunk sayısı raporluyor | ✅ 219 bölüm → 276 chunk, 120 sn |
+| `streamlit run app.py` çalışan arayüz sunuyor | ✅ tarayıcıda test edildi |
+| Notebook ≥5 soru-cevap çifti, hepsi atıflı | ⚠️ **9 çift ✅, atıf 6/7** — Duxet sorusu atıfsız kaldı (README sınırlılık #8) |
+| ≥1 "bilmiyorum" + ≥1 konu dışı reddi | ✅ ikisi de, boş tool izi |
+| Her formattan ≥1 soru cevaplanmış | ✅ PDF + DOCX + XLSX |
+| ≥1 soru **DOCX tablosundan** (`1.500 TL/ay`) | ✅ CLI ve notebook'ta |
+| Tool çağrı izi demoda görünür | ✅ notebook + Streamlit paneli |
+| README: 3 komut, ASCII mimari, gerekçeler, zorluklar, sınırlılıklar | ✅ hepsi |
+| `docker compose up` sistemi ayağa kaldırıyor | ✅ HTTP 200 |
+| `pytest --cov --cov-fail-under=70` geçiyor | ✅ 103 passed, %95,05 |
+| Teslim ZIP'i `data/` içeriyor ve sıfırdan çalışıyor | ⏳ ZIP oluşturulacak |
 
 **Bağımlılık zinciri:** 1 → 2 → {3, 4, 5} → 6 → 7 → 8 → 9 → {10, 11} → 12 → 13 → 14
 
@@ -204,3 +220,4 @@ Her faz kapandığında buraya bir satır eklenir.
 | 2026-08-02 | 1 | Task 11 — LLM sağlayıcıları | `feat(llm)` | 91 passed + 2 skipped, %97,80 cov | Ollama smoke test ✅ ("Merhaba!"). ⚠️ Yerel etiket `-q4_K_M`; SYSTEM_PROMPT tool çağrısını engelliyor (Task 12'ye devredildi) |
 | 2026-08-02 | 1 | Task 12 — Agent döngüsü | `feat(agent)` | 103 passed + 2 skipped, %95,05 cov | 3 kök neden: kısa prompt + `CITATION_REMINDER` tool sonucunda, tool çağrılmazsa **bağlam enjeksiyonu**, timeout 120s→600s. Uçtan uca doğrulandı |
 | 2026-08-02 | 1 | Task 13 — CLI + Streamlit | `feat(cli)` | 103 passed + 2 skipped, %95,05 cov | CLI: DOCX tablosundan `1.500 TL/ay` ✅. Streamlit tarayıcıda test edildi: konu dışı → Kaynaklar(0)/Araç(0); Vitatin95 → 1 kaynak + trace tablosu |
+| 2026-08-02 | 1 | Task 14 — Demo, Docker, README | `docs` | 103 passed + 2 skipped, %95,05 cov | Notebook 9 senaryo 0 hata (~25 dk); Docker `up` → HTTP 200; 3 komut sıfırdan doğrulandı. Duxet sorusu atıfsız kaldı (sınırlılık #8) |

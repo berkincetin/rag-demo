@@ -339,6 +339,19 @@ Tool sonucu bağlama girince 7B model CPU'da 120s'i aşıyor → `ReadTimeout`. 
 | **İlk soru yavaş, sonrakiler hızlı** | `@st.cache_resource` sayesinde indeks + embedding modeli bir kez yükleniyor. İlk soruda ~20s ek gecikme var, README'de belirtilmeli |
 | **`build_agent` eşikleri config'den alıyor** | Task 9'da eklenen `min_bm25` buraya da geçirildi; aksi halde retriever varsayılanı kullanılır ve `.env` ayarı sessizce yok sayılırdı |
 
+### Task 14 — Demo notebook, Docker, README (2026-08-02)
+
+| Konu | Öğrenilen |
+|---|---|
+| **Notebook göreli yol tuzağı** | `nbconvert` notebook'u **kendi klasöründe** çalıştırıyor; `STORAGE_DIR=./storage` → `notebooks/storage` oluyor ve `InvalidCollectionException: Collection documents does not exist` alınıyor. Çözüm: setup hücresinde `os.chdir(ROOT)`. `ROOT` hem kökten hem `notebooks/` içinden çalışacak şekilde tespit ediliyor |
+| **`jupyter` bağımlılık olarak eklendi** | Plan Step 2 `jupyter nbconvert` çalıştırmayı şart koşuyor ve notebook case teslim kalemi. `requirements.txt`'e **geliştirme/demo aracı** bölümüne eklendi (çalışma zamanı bağımlılığı 10 olarak kaldı) |
+| **Notebook 9 senaryo, 0 hata** | 12 hücrenin hepsi hatasız çalıştı. 9 soru-cevap çifti, **6'sı atıflı**. Format kapsamı tam: PDF + DOCX + XLSX + DOCX tablosu (`1.500 TL/ay`) |
+| ⚠️ **Ölçülmüş yanlış negatif: Duxet sorusu** | Retrieval doğruydu (0,849 / 7,51, tool 6.255 karakter döndürdü) ama model `[n]` işareti koymadı → atıf post-check cevabı "bilgi bulamadım" yaptı. **Kod hatası değil**, yerel 7B modelin zayıflığı; güvenlik ağı uydurmak yerine reddetmeyi seçti. README sınırlılık #8'e ölçümüyle yazıldı. Otomatik atıf iliştirmek **yapılmadı** — model kullanmadığı kaynağı göstermek atıf uydurmak olurdu |
+| **Atıf seçimi de kusurlu olabiliyor** | Aksef sorusunda cevap doğru ama model `Bölüm 1` ve `4.2`'yi işaretledi (`4.3` yerine). Retrieval sıralaması doğru, işaretleme modele bağlı |
+| **CPU'da demo çok yavaş** | Tek soru 60–460 saniye (Duxet 461 sn). Tüm notebook ~25 dakika. Değerlendirici için README'de uyarı var |
+| **Docker doğrulandı** | `docker compose build` başarılı (`rag-demo-rag`), `docker compose up -d` → `localhost:8501` **HTTP 200**, ollama konteyneri "Ollama is running". Model konteyner içinde ayrıca çekilmeli (`docker compose exec ollama ollama pull ...`) — README'de yazılı |
+| **Üç komut sıfırdan doğrulandı** | `storage/` silinip `pip install` + `ingest.py` tekrar çalıştırıldı: 219 bölüm → 276 chunk, 120 sn. Ara adım gerekmedi |
+
 ---
 
 ## 5. Açık Sorular / Bekleyen Kararlar

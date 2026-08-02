@@ -15,6 +15,7 @@ adım adım uygulama planlarını içerir.
 |---|---|
 | [00-case-analizi.md](00-case-analizi.md) | Case'in maddelenmiş özeti + gereksinim izlenebilirlik matrisi (her istenen madde → nerede karşılanıyor) |
 | [01-veri-kesif-bulgulari.md](01-veri-kesif-bulgulari.md) | Her iki veri setinin gerçek ölçümlerle profillenmesi; tasarımı etkileyen kritik bulgular |
+| [04-docker-uctan-uca-test-raporu.md](04-docker-uctan-uca-test-raporu.md) | Docker'da uçtan uca test raporu: her özelliğin teknolojisi, gerekçesi, çalışma biçimi ve ölçülmüş kanıtı; bulunan 3 kusur ve çözümleri |
 | [02-karar-kaydi.md](02-karar-kaydi.md) | Teknoloji/model seçimlerinin gerekçeleri (ADR formatı) — case "kararların gerekçelendirilebilmesi" istiyor |
 | [bolum1-rag/PRD.md](bolum1-rag/PRD.md) | RAG agent ürün gereksinimleri, kapsam, kabul kriterleri |
 | [bolum1-rag/TRD.md](bolum1-rag/TRD.md) | RAG agent teknik tasarımı: mimari, modüller, veri modeli, algoritmalar |

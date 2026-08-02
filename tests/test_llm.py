@@ -1,11 +1,14 @@
 import pytest
 
 from src.rag.config import Config
+from src.rag.credentials import SessionCredentialStore
 from src.rag.llm import (
     AnthropicClient,
+    GeminiClient,
     LLMResponse,
     OllamaClient,
     OpenAIClient,
+    TokenUsage,
     get_client,
     parse_ollama_response,
 )
@@ -83,6 +86,59 @@ def test_parse_ollama_response_extracts_tool_calls():
 
 def test_llm_response_reports_whether_it_wants_tools():
     assert LLMResponse(text="hi", tool_calls=[]).wants_tools is False
+
+
+def test_ollama_usage_is_read_from_eval_counts():
+    payload = {
+        "message": {"content": "Merhaba", "tool_calls": []},
+        "prompt_eval_count": 120,
+        "eval_count": 45,
+    }
+
+    assert parse_ollama_response(payload).usage == TokenUsage(120, 45)
+
+
+def test_missing_usage_fields_are_none_not_zero():
+    # Zero would claim "measured and it was zero", which is a different fact.
+    payload = {"message": {"content": "Merhaba", "tool_calls": []}}
+
+    usage = parse_ollama_response(payload).usage
+
+    assert usage.input_tokens is None
+    assert usage.output_tokens is None
+
+
+def test_usage_defaults_to_empty_on_a_bare_response():
+    assert LLMResponse(text="x").usage == TokenUsage(None, None)
+
+
+def test_get_client_uses_the_session_key_for_anthropic(monkeypatch):
+    pytest.importorskip("anthropic")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    store = SessionCredentialStore()
+    store.set("anthropic", "sk-session-key")
+
+    assert isinstance(get_client(Config.load(), credentials=store), AnthropicClient)
+
+
+def test_get_client_routes_to_gemini(monkeypatch):
+    pytest.importorskip("google.genai")
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+    assert isinstance(get_client(Config.load()), GeminiClient)
+
+
+def test_gemini_is_in_the_routing_table(monkeypatch):
+    # Routing is what's under test. A missing SDK or a missing key both mean the
+    # call reached Gemini's constructor; only "unsupported provider" is a routing bug.
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    try:
+        get_client(Config.load())
+    except (ModuleNotFoundError, ValueError) as error:
+        assert "unsupported LLM_PROVIDER" not in str(error)
 
 
 def test_ollama_timeout_is_configurable(monkeypatch):

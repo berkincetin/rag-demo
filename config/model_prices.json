@@ -1,0 +1,9 @@
+{
+  "_kaynak": "Anthropic fiyatlari 2026-06-24 tarihli resmi fiyat tablosundan alinmistir. Birim: 1M token basina USD. OpenAI ve Gemini fiyatlari DOGRULANMADIGI icin null birakilmistir - dogru degerleri girene kadar arayuz 'fiyat girilmedi' gosterir. Uydurma fiyat girmeyin.",
+  "_guncelleme": "2026-08-02",
+  "claude-opus-5": {"input": 5.0, "output": 25.0},
+  "claude-sonnet-5": {"input": 3.0, "output": 15.0},
+  "claude-haiku-4-5": {"input": 1.0, "output": 5.0},
+  "gpt-4o-mini": {"input": null, "output": null},
+  "gemini-2.0-flash": {"input": null, "output": null}
+}

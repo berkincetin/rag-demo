@@ -68,11 +68,32 @@ def test_tool_call_result_is_fed_back_and_the_final_answer_is_returned():
     assert answer.tool_trace[0]["name"] == "search_documents"
 
 
+def test_an_uncited_answer_gets_one_repair_attempt_before_being_discarded():
+    # Measured: the same grounded prompt occasionally omits the [n] marker, and
+    # the citation gate then throws away a correct answer. One explicit retry
+    # recovers it instead of showing "bilgi bulamadım" for a known fact.
+    llm = _ScriptedLLM(
+        [
+            LLMResponse(tool_calls=[ToolCall("1", "search_documents", {"query": "izin"})]),
+            LLMResponse(text="İzin HRPortal üzerinden alınır."),
+            LLMResponse(text="İzin HRPortal üzerinden alınır [1]."),
+        ]
+    )
+    agent = Agent(_StubRetriever(confident=True), _StubToolBox(), llm)
+
+    answer = agent.answer("Yıllık izin nasıl alınır?")
+
+    assert answer.citations == ["sss.xlsx — Genel SSS, satır 4"]
+    assert "HRPortal" in answer.text
+    assert llm.call_count == 3
+
+
 def test_answer_without_any_citation_is_replaced_by_the_no_info_template():
     llm = _ScriptedLLM(
         [
             LLMResponse(tool_calls=[ToolCall("1", "search_documents", {"query": "x"})]),
             LLMResponse(text="Bence muhtemelen 20 gündür."),
+            LLMResponse(text="Bence muhtemelen 20 gündür."),  # onarım turu da atıfsız
         ]
     )
     agent = Agent(_StubRetriever(confident=True), _StubToolBox(), llm)

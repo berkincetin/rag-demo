@@ -352,6 +352,54 @@ Tool sonucu bağlama girince 7B model CPU'da 120s'i aşıyor → `ReadTimeout`. 
 | **Docker doğrulandı** | `docker compose build` başarılı (`rag-demo-rag`), `docker compose up -d` → `localhost:8501` **HTTP 200**, ollama konteyneri "Ollama is running". Model konteyner içinde ayrıca çekilmeli (`docker compose exec ollama ollama pull ...`) — README'de yazılı |
 | **Üç komut sıfırdan doğrulandı** | `storage/` silinip `pip install` + `ingest.py` tekrar çalıştırıldı: 219 bölüm → 276 chunk, 120 sn. Ara adım gerekmedi |
 
+### Docker uçtan uca test + atıf hatasının kökü (2026-08-02)
+
+#### 🚨 Kök neden: örnekleme sıcaklığı ayarlanmamıştı
+
+Task 14'te "yerel modelin zayıflığı" diye not edilen atıf kaybı aslında **bizim
+hatamızdı**. `OllamaClient` hiç `options.temperature` göndermiyordu → Ollama varsayılanı
+**0.8**. Sonuç aralıklı ve teşhisi zor: aynı soru, aynı indeks, bazen atıflı doğru cevap,
+bazen "bilgi bulamadım".
+
+**Teşhis yolu (yanlış hipotezler dahil, tekrar denenmesin):**
+
+| Hipotez | Test | Sonuç |
+|---|---|---|
+| Prompt zayıf, hatırlatma yanlış yerde | Hatırlatma önce/sonra/ikisi (3 varyant) | ❌ Üçü de atıf üretti |
+| Son turda `TOOL_SCHEMAS` göndermek bozuyor | tools var/yok × 2 soru × 3 koşu | ❌ 12/12 atıf üretti |
+| **Örnekleme belirlenimsizliği** | temp 0.8 vs 0, 5'er koşu | ✅ temp=0'da **5 çıktı da birebir aynı**; 0.8'de her seferinde farklı, biri bozuk Türkçe (`"kayieńde"`) |
+
+Küçük örneklem tuzağı: 0.8'de 12/12 atıf gördüm ama gerçek hata oranı ~%10 olduğu için
+başarısızlığı yakalayamadım. **İki gerçek başarısızlık** (notebook Duxet, Docker yakıt
+limiti) aynı girdinin başka koşularda başarılı olmasıyla birlikte kanıt oluşturdu.
+
+**Düzeltme iki katmanlı:**
+1. `LLM_TEMPERATURE=0` varsayılan → tekrarlanabilir çıktı. Docker smoke test **3 ardışık
+   koşuda kelimesi kelimesine aynı** sonucu verdi.
+2. `CITATION_REPAIR` — cevap atıfsız kalırsa **bir kez** açık talimatla yeniden sorulur.
+   Yalnızca `final_text` doluysa tetiklenir; tur limiti dolduğunda tetiklenmez (mevcut
+   `max_tool_turns` testi bu regresyonu yakaladı).
+
+#### Retrieval de tam belirlenimci değil (küçük)
+
+Aynı konu dışı soru iki koşuda `0,781 / 0,00` ve `0,782 / 3,64` verdi — Chroma HNSW
+yaklaşık araması, skorlar neredeyse eşitken ilk sırayı değiştiriyor. **Alan içi
+sorularda skorlar birebir aynı**, kapı kararı hiç değişmedi. Eşiğe çok yakın bir soru
+teorik olarak koşudan koşuya farklı karar alabilir.
+
+#### Docker bulguları
+
+| Konu | Ölçüm |
+|---|---|
+| **`.dockerignore` yoktu** | 1,52 GB'lık Windows `.venv` imaja kopyalanıyordu. Eklendikten sonra imaj **8,98 → 7,37 GB**, `/app` 3,2 MB → **1,4 MB** |
+| Case arşivi de imajdaydı | `AI Engineer/` (korpusun 2. kopyası + Bölüm 2 veri seti) çıkarıldı |
+| Konteynerde Python | **3.11.15** (yerelde 3.10.3). Kod 3.10 uyumlu yazıldığı için sorun çıkmadı — `str \| None` her ikisinde de geçerli |
+| Konteynerde ingest | 219 bölüm → **276 chunk**, Windows'la **birebir aynı** |
+| Konteynerde testler | **103 test geçti** (77 birim + 26 entegrasyon) — platform bağımsızlığı kanıtlandı |
+| Embedding modeli | İmajda önceden gömülü, `~/.cache/huggingface` = **2,27 GB** |
+| Servisler arası ağ | `rag` → `http://ollama:11434` çalışıyor |
+| `scripts/smoke_test.py` | Yeni: dağıtım doğrulama betiği, 5 senaryo, kapı+atıf+tool kontrolü |
+
 ---
 
 ## 5. Açık Sorular / Bekleyen Kararlar

@@ -18,6 +18,11 @@ from src.rag.config import Config
 # prompt carries the retrieved passages. 120s was measured to be too short.
 _DEFAULT_TIMEOUT_SECONDS = 600
 
+# Ollama varsayılanı 0.8. Ölçüldü: 0.8'de aynı temellendirilmiş istem bazen
+# [n] atıf işaretini atlıyor ve atıf kapısı doğru cevabı eliyor. 0'da çıktı
+# tekrarlanabilir oluyor ve Türkçe kalitesi de düzeliyor.
+_DEFAULT_TEMPERATURE = 0.0
+
 
 @dataclass
 class ToolCall:
@@ -61,18 +66,37 @@ def _as_dict(value: Any) -> dict[str, Any]:
 
 
 class OllamaClient:
-    def __init__(self, model: str, base_url: str | None = None, timeout: int | None = None) -> None:
+    def __init__(
+        self,
+        model: str,
+        base_url: str | None = None,
+        timeout: int | None = None,
+        temperature: float | None = None,
+    ) -> None:
         self.model = model
         self.base_url = base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         self.timeout = timeout or int(
             os.getenv("LLM_TIMEOUT_SECONDS", str(_DEFAULT_TIMEOUT_SECONDS))
         )
+        self.temperature = (
+            temperature
+            if temperature is not None
+            else float(os.getenv("LLM_TEMPERATURE", str(_DEFAULT_TEMPERATURE)))
+        )
+
+    def _post(self, url: str, json: dict[str, Any], timeout: int):
+        return requests.post(url, json=json, timeout=timeout)
 
     def chat(self, messages, tools=None) -> LLMResponse:
-        body: dict[str, Any] = {"model": self.model, "messages": messages, "stream": False}
+        body: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "stream": False,
+            "options": {"temperature": self.temperature},
+        }
         if tools:
             body["tools"] = [{"type": "function", "function": schema} for schema in tools]
-        response = requests.post(f"{self.base_url}/api/chat", json=body, timeout=self.timeout)
+        response = self._post(f"{self.base_url}/api/chat", json=body, timeout=self.timeout)
         response.raise_for_status()
         return parse_ollama_response(response.json())
 

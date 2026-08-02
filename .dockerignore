@@ -1,0 +1,35 @@
+# Sanal ortam: Windows'a özel, Linux imajında tamamen işe yaramaz (~1,5 GB)
+.venv/
+venv/
+
+# İndeks konteyner içinde üretilir; ayrıca volume olarak bağlanır
+storage/
+
+# Git geçmişi ve araç yapılandırmaları
+.git/
+.gitignore
+.claude/
+
+# Python artıkları
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Notebook kontrol noktaları
+.ipynb_checkpoints/
+
+# Yerel gizli ayarlar (compose env_file ile ayrıca aktarılır)
+.env
+
+# Teslim paketi
+rag-demo.zip
+
+# Planlama dokümanları çalışma zamanında gerekmez
+docs/
+
+# Kaynak arşivi: korpusun ikinci kopyası + Bölüm 2 veri seti.
+# Bölüm 1 çalışma zamanı yalnızca data/ klasörünü okur.
+AI Engineer/

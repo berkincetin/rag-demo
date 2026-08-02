@@ -11,6 +11,7 @@ from typing import Any
 from src.rag.models import Answer
 from src.rag.prompts import (
     CITATION_REMINDER,
+    CITATION_REPAIR,
     NO_INFO_TEMPLATE,
     REFUSAL_TEMPLATE,
     SYSTEM_PROMPT,
@@ -82,6 +83,15 @@ class Agent:
                 )
 
         citations = extract_citations(final_text, outputs)
+        if not citations and outputs and final_text:
+            # The passages were retrieved but the answer carries no [n] marker.
+            # Sampling makes this intermittent, so ask once, explicitly, before
+            # discarding an answer that may well be correct.
+            messages.append({"role": "assistant", "content": final_text})
+            messages.append({"role": "user", "content": CITATION_REPAIR})
+            final_text = self.llm.chat(messages, TOOL_SCHEMAS).text or final_text
+            citations = extract_citations(final_text, outputs)
+
         if not citations:
             return Answer(text=NO_INFO_TEMPLATE, tool_trace=trace)
         return Answer(text=final_text, citations=citations, tool_trace=trace)

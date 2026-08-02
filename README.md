@@ -259,14 +259,26 @@ jupyter lab notebooks/demo.ipynb
 
 ```bash
 docker compose up --build
+docker compose exec ollama ollama pull qwen2.5:7b-instruct   # ilk kullanımda, ~4,7 GB
 ```
 
-`localhost:8501` arayüzü açar; `ollama` servisi ayrı konteynerde çalışır. **İlk kullanımda**
-modeli ollama konteynerinin içinde çekmek gerekir:
+`localhost:8501` arayüzü açar; `ollama` ayrı konteynerde çalışır ve `rag` servisi ona
+`http://ollama:11434` üzerinden erişir. Model, adlandırılmış `ollama` volume'ünde kalıcıdır;
+ikinci `up` çağrısında tekrar indirilmez.
+
+`.dockerignore` sanal ortamı, indeksi ve planlama dokümanlarını build bağlamının dışında
+tutar — imaj **8,98 GB → 7,37 GB** küçülür, uygulama katmanı 1,4 MB'a iner. Kalan boyut
+büyük ölçüde PyTorch ve imaja önceden gömülen embedding modelidir (2,27 GB); bu kasıtlıdır,
+ilk çalıştırmada 1,1 GB'lık indirmeyi bekletmemek için.
+
+Dağıtımı doğrulamak için:
 
 ```bash
-docker compose exec ollama ollama pull qwen2.5:7b-instruct
+docker compose exec rag python scripts/smoke_test.py
 ```
+
+Sabit bir soru setini çalıştırır; her soru için skor kapısı, atıf ve tool izini kontrol
+edip `Başarısız kontrol sayısı: 0` bekler.
 
 ---
 
@@ -302,15 +314,30 @@ kontrol akışı mock'lanmış bir LLM ile test edilir.
    çağrısını tamamen bastırıyor. Bu yüzden sistem promptu kısa tutuldu ve agent, model tool
    çağırmazsa aramayı kendisi yapıp izde `injected: true` olarak işaretliyor. Bulut modelde
    bu sorun görülmez.
-8. **Atıf işaretlemesi modele bağlı — ölçülmüş yanlış negatif var.** Demo notebook'unda
-   7 geçerli sorunun **6'sı** atıflı cevaplandı. "Duxet'in gebelikte kullanımı" sorusunda
-   retrieval doğru çalıştı (kosinüs 0,849 / BM25 7,51, tool 6.255 karakter döndürdü) ama
-   model cevabına `[n]` işareti koymadı; atıf post-check'i devreye girip cevabı
-   "bilgi bulamadım" ile değiştirdi. Bu **kasıtlı bir tercih**: kaynağı doğrulanamayan bir
-   cevabı vermektense reddetmek yeğdir. Yine de yanlış negatif oranı yerel modelde sıfır
-   değil. Aynı şekilde atıf *seçimi* de her zaman isabetli değil — Aksef sorusunda cevap
-   doğru bölümden geliyor ama model `Bölüm 1` ve `4.2`'yi işaretledi. Bulut sağlayıcıya
-   geçmek (`LLM_PROVIDER=anthropic`) her iki davranışı da belirgin şekilde iyileştirir.
+8. **Atıf *seçimi* her zaman isabetli değil.** Aksef sorusunda cevap doğru bölümden
+   geliyor ama model `Bölüm 1` ve `4.2`'yi işaretleyebiliyor. Retrieval sıralaması doğru;
+   hangi kaynağı işaretleyeceği modele kalmış. Bulut sağlayıcıya geçmek
+   (`LLM_PROVIDER=anthropic`) bunu belirgin şekilde iyileştirir.
+9. **Retrieval, eşiğe çok yakın skorlarda tam belirlenimci değil.** Chroma'nın HNSW
+   yaklaşık komşuluk araması, skorların neredeyse eşit olduğu (tipik olarak konu dışı)
+   sorgularda ilk sırayı değiştirebiliyor: ölçülen örnek, aynı konu dışı soru için
+   `0,781 / 0,00` ve `0,782 / 3,64`. Alan içi sorularda skorlar koşular arasında birebir
+   aynı çıktı ve kapı kararı her iki durumda da değişmedi.
+
+### Belirlenimlilik: `temperature=0` neden zorunlu
+
+İlk sürümde `OllamaClient` örnekleme sıcaklığı ayarlamıyordu; Ollama varsayılanı **0.8**.
+Sonuç, aralıklı ve teşhisi zor bir hataydı: **aynı** soru, **aynı** indeks, bazen atıflı
+doğru cevap, bazen "bilgi bulamadım". Ölçüm sırasında yakıt limiti sorusu bir koşuda
+`1.500 TL/ay` cevabını verdi, bir sonraki koşuda elendi — çünkü model o üretimde `[n]`
+işaretini atlamıştı ve atıf post-check'i (3. katman) cevabı doğru şekilde reddetti.
+0.8'de üretilen metinlerde bozuk Türkçe de görüldü (`"[1] kayieńde belirtilen..."`).
+
+`LLM_TEMPERATURE=0` ile aynı istem her seferinde **birebir aynı** cevabı veriyor; smoke
+test üç ardışık koşuda kelimesi kelimesine aynı çıktıyı üretti. Ayrıca cevap hâlâ atıfsız
+kalırsa agent **bir kez** açık bir talimatla yeniden soruyor (`CITATION_REPAIR`); o da
+başarısız olursa cevap "bilgi bulamadım" ile değiştiriliyor. Yani doğru cevabı kaybetme
+riski azaltıldı, ama kaynaksız cevap verme riski hiç alınmadı.
 
 **Geliştirme fikirleri:** cross-encoder yeniden sıralama, sorgu genişletme (HyDE), RAGAS ile
 otomatik değerlendirme, belge değişikliğini izleyen artımlı ingest, çok turlu sohbet bağlamı.

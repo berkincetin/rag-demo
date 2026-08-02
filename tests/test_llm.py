@@ -95,3 +95,38 @@ def test_ollama_timeout_is_configurable(monkeypatch):
 
 def test_ollama_timeout_default_allows_a_cpu_second_turn():
     assert OllamaClient(model="m").timeout >= 300
+
+
+def test_ollama_defaults_to_deterministic_sampling():
+    # Ollama's default temperature is 0.8. Measured: at 0.8 the same grounded
+    # prompt sometimes omits the [n] citation marker, and the citation gate then
+    # discards a correct answer. Grounded QA wants reproducible output.
+    assert OllamaClient(model="m").temperature == 0.0
+
+
+def test_ollama_temperature_is_configurable(monkeypatch):
+    monkeypatch.setenv("LLM_TEMPERATURE", "0.7")
+
+    assert OllamaClient(model="m").temperature == 0.7
+
+
+def test_ollama_sends_temperature_in_the_request_options():
+    sent = {}
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"message": {"content": "ok", "tool_calls": []}}
+
+    def _fake_post(url, json, timeout):
+        sent.update(json)
+        return _FakeResponse()
+
+    client = OllamaClient(model="m")
+    client._post = _fake_post
+
+    client.chat([{"role": "user", "content": "x"}])
+
+    assert sent["options"]["temperature"] == 0.0

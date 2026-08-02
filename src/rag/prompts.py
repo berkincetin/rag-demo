@@ -23,6 +23,16 @@ CITATION_REMINDER = (
     "Kaynaklarda cevap yoksa bilgi bulunmadığını söyle, tahmin yürütme."
 )
 
+# Cevapta hiç [n] işareti çıkmadığında bir kez daha sorulur. Örnekleme
+# belirlenimsizliği yüzünden bu aralıklı olarak yaşanıyor; atıfsız cevap
+# elenmek zorunda olduğu için tek bir onarım turu doğru cevabı kurtarıyor.
+CITATION_REPAIR = (
+    "Cevabında kaynak numarası yok. Aynı cevabı yeniden yaz ve kullandığın "
+    "her bilginin sonuna ilgili kaynağın numarasını [1], [2] biçiminde ekle. "
+    "Yukarıdaki kaynaklarda bu bilgi gerçekten yoksa sadece "
+    "'Bilgi bulunamadı' yaz."
+)
+
 REFUSAL_TEMPLATE = (
     "Bu soru şirket bilgi tabanımın kapsamı dışında görünüyor. "
     "Ben İK politikaları, araç kullanım prosedürü, çalışan SSS, ürün taksonomisi "

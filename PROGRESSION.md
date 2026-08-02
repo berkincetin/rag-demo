@@ -5,9 +5,13 @@
 
 **Son güncelleme:** 2026-08-02
 **Aktif bölüm:** Bölüm 1 — RAG Agent
-**Aktif bölüm:** Bölüm 1 **tamamlandı** (14/14 task) — Bölüm 2 planlaması bekliyor
-**Sıradaki somut adım:** Teslim ZIP'i (`data/` elle eklenerek) → sonra Bölüm 2 superpowers
-planı `docs/superpowers/plans/analiz/` altına yazılacak
+**Aktif bölüm:** Bölüm 1 tamamlandı (14/14). **Sağlayıcı Merkezi genişletmesi planlandı,
+onay bekliyor** — kod yazılmadı.
+**Okunacak dosya:** [tasarım](docs/superpowers/specs/2026-08-02-saglayici-merkezi-tasarim.md)
++ [plan genel bakış](docs/superpowers/plans/saglayici-merkezi/00-overview.md)
+**Sıradaki somut adım:** Kullanıcı onayı → Task 1 (model kataloğu + fiyat tablosu)
+
+> ⚠️ **Bölüm 2 (Satış Analizi) hâlâ başlamadı.** Kullanıcı kararı: genişletme önce.
 
 > ⚠️ **Eşik değerleri değişti:** `MIN_COSINE=0.72` **geçersiz**. Kalibre edilmiş değerler
 > `MIN_COSINE=0.80` + `MIN_BM25=5.0` (VE kapısı). Gerekçe ve ölçüm tablosu MEMORY.md Task 9.
@@ -24,7 +28,8 @@ planı `docs/superpowers/plans/analiz/` altına yazılacak
 |---|---|
 | Planlama (case analizi, veri keşfi, PRD/TRD/task planları) | ✅ Tamamlandı — 2026-08-01 |
 | Bölüm 1 — RAG Agent | ✅ Tamamlandı — 2026-08-02 (14/14 task) |
-| Bölüm 2 — Satış Analizi | ⬜ Başlamadı (0/7 faz) — Bölüm 1 teslim edilebilir olmadan başlanmaz |
+| Sağlayıcı Merkezi genişletmesi | 📋 Planlandı (0/13 task) — **onay bekliyor**, kod yazılmadı |
+| Bölüm 2 — Satış Analizi | ⬜ Başlamadı (0/7 faz) — genişletmeden sonra |
 
 Legend: ⬜ başlamadı · 🔄 devam ediyor · ✅ tamamlandı · ⚠️ engellendi
 

@@ -9,7 +9,12 @@ Durum etiketleri: ✅ Kesin — tüm kararlar onaylandı (2026-08-01).
 
 ---
 
-## ADR-001 — Framework: Ham Python + sağlayıcı SDK'sı (LangChain/LlamaIndex **yok**) ✅
+## ADR-001 — Framework: Ham Python + sağlayıcı SDK'sı (LangChain/LlamaIndex **yok**) ⚠️ SUPERSEDED
+
+> ⚠️ **Bu karar [ADR-011](#adr-011--agent-langgraph-durum-makinesine-taşındı-) ile
+> geçersiz kılınmıştır (2026-08-03).** Gerekçesi ("demo ölçeğinde soyutlama borç üretir")
+> tek sağlayıcılı, tek akışlı sistem için doğruydu; çok sağlayıcılı ve dallanmalı
+> genişletmede geçerliliğini yitirdi. Aşağıdaki metin tarihsel kayıt olarak durur.
 
 **Bağlam.** Korpus ~100 bin karakter, ~350 chunk. Zorunlu gereksinim yalnızca "≥1 tool
 entegrasyonu" ve kaynak gösterimi.
@@ -226,3 +231,66 @@ zaman serisinde yanıltıcı olur.
 
 **Sonuç.** MAPE, sıfıra yakın gerçek değerlerde patlıyor → yanına **WAPE** ve **sMAPE**
 raporlanacak; MAPE yine de case istediği için tabloda kalacak.
+
+---
+
+## ADR-011 — Agent LangGraph durum makinesine taşındı ✅
+
+**Tarih:** 2026-08-03 · **Durum:** Kabul · **Geçersiz kılar:** ADR-001
+
+**Bağlam.** ADR-001 ham Python döngüsünü seçmişti ve gerekçesi doğruydu: tek sağlayıcılı,
+tek akışlı bir demoda soyutlama katmanı fayda değil borç üretir. Genişletme bu varsayımı
+bozdu — dallanma (onarım turu, bağlam enjeksiyonu, çok sağlayıcılı yönlendirme), düğüm
+başına ölçüm ve akışın görselleştirilmesi ham döngüde elle yazılacak şeylere dönüştü.
+
+**Karar.** Agent döngüsü `src/rag/graph.py` içinde bir LangGraph durum makinesine taşındı.
+`Agent` sınıfı ince bir cephe olarak kaldı; genel arayüzü değişmedi.
+
+**Sonuç.**
+- Üç katmanlı güvenlik ağı artık ayrı düğümler: `score_gate` → `llm_turn`/`run_tools` →
+  `citation_check` → `repair`. Akış `graph.get_graph()` ile denetlenebiliyor.
+- Bağımlılık sayısı 10 → 15 (langgraph, langchain-core + üç bulut SDK'sı).
+- **Migrasyonun kabul kriteri:** `tests/test_agent.py` **tek karakter değiştirilmeden**
+  geçmek zorundaydı. Geçti (8/8, dosya hash'i birebir aynı) ve uçtan uca smoke test
+  gerçek modelde 0 hata verdi.
+
+**Alternatif.** Ham döngüde kalıp dallanmayı `if`'lerle büyütmek. Reddedildi: kullanıcı
+LangGraph'ı açıkça istedi ve düğüm başına ölçüm ham döngüde dağınık kalırdı.
+
+---
+
+## ADR-012 — API anahtarları yalnız oturum belleğinde ✅
+
+**Tarih:** 2026-08-03 · **Durum:** Kabul
+
+**Bağlam.** Arayüzden OpenAI/Anthropic/Gemini anahtarı girilebilmesi istendi. Anahtarlar
+`.env`'e, bir dosyaya veya işletim sistemi kasasına yazılabilirdi.
+
+**Karar.** Anahtarlar **yalnızca** Streamlit oturum belleğinde tutulur. `credentials.py`
+modülünde hiçbir kalıcılık çağrısı yoktur ve bu bir testle korunur (kaynak kodda `open(`,
+`Path(`, `write_text`, kasa kütüphanesi adı geçemez). `__repr__` anahtar sızdırmaz;
+ekranda yalnız son 4 karakter gösterilir.
+
+**Sonuç.** Sekme kapanınca anahtar gider — değerlendiricinin makinesinde kalıcı sır
+bırakılmaz. Ortam değişkeni **okuma yönünde** yedek olarak kalır, böylece CLI ve Docker
+akışları bozulmaz.
+
+---
+
+## ADR-013 — Fiyatlar elle güncellenen JSON'da; doğrulanmamış fiyat `null` ✅
+
+**Tarih:** 2026-08-03 · **Durum:** Kabul
+
+**Bağlam.** Maliyet paneli için model başına birim fiyat gerekiyor. Fiyatlar sık değişiyor
+ve koda gömmek onları sessizce eskitiyor.
+
+**Karar.** Fiyatlar `config/model_prices.json` dosyasında, kaynak ve tarih notuyla tutulur.
+**Doğrulanmamış bir fiyat `null` bırakılır**; `estimate_cost` `None` döner ve arayüz
+**"fiyat girilmedi"** yazar — `$0` **yazmaz**.
+
+**Sonuç.** Şu an yalnız Anthropic fiyatları doğrulanmış kaynaktan girilidir (2026-06-24
+tablosu). OpenAI ve Gemini `null`'dur. Toplamlarda `priced_runs` ayrıca raporlanır, böylece
+"toplam maliyet düşük" yanılgısı oluşmaz.
+
+**Alternatif.** Fiyatları API'den çekmek. Reddedildi: ağ bağımlılığı + kırılganlık, ve
+sağlayıcıların hepsi programatik fiyat uçları sunmuyor.

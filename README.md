@@ -12,9 +12,14 @@ Bilmediğini söyler, konu dışı soruları kibarca reddeder, hiçbir cevabı k
 
 ```bash
 pip install -r requirements.txt
+python scripts/setup.py     # Ollama'yı kontrol eder, sohbet modelini çeker
 python scripts/ingest.py
 streamlit run app.py
 ```
+
+`setup.py` Ollama kurulu değilse **kurmaz** — platformunuza uygun kurulum komutunu
+yazdırıp durur; kurulumu siz çalıştırırsınız. Kuruluysa modeli çeker (kuantize sürüm
+zaten varsa tekrar indirmez).
 
 `ingest.py` altı belgeyi okur, 276 chunk üretir ve indeksi `storage/` altına yazar
 (ilk çalıştırmada embedding modeli ~1,1 GB indirilir). `app.py` arayüzü
@@ -33,6 +38,45 @@ yeterlidir; ilgili SDK'yı ayrıca kurmanız gerekir (`pip install anthropic`).
 > ⚠️ **`LLM_MODEL` gerçekten çektiğiniz etiketle birebir aynı olmalı.** `ollama list` ile
 > kontrol edin — kuantize sürümler `qwen2.5:7b-instruct-q4_K_M` gibi bir sonek taşır ve
 > düz etiket `404` döndürür.
+
+---
+
+## Arayüz — beş sayfa
+
+| Sayfa | Ne yapar |
+|---|---|
+| 💬 **Sohbet** | Soru sorar; cevabın altında **aktif model**, süre, token ve maliyet gösterir. Kaynaklar ve araç izi panelleri korunur |
+| ⚙️ **Sağlayıcılar** | Anthropic / OpenAI / Gemini anahtarı girilir, aktif model seçilir |
+| 📦 **Yerel Modeller** | Ollama modellerini listeler, ilerleme çubuğuyla indirir, siler |
+| 📊 **Metrikler** | Model bazında koşu sayısı, ortalama süre, atıf, kapı isabeti ve maliyet; geçmiş tablosu |
+| 🎯 **Değerlendirme** | Seçilen modelleri 13 soruluk sabit setle karşılaştırır |
+
+### 🔒 Anahtarlar nerede tutuluyor
+
+Arayüzden girilen API anahtarları **yalnızca o oturumun belleğinde** tutulur: diske
+yazılmaz, log'a düşmez, metrik veritabanına girmez, ekranda yalnız son 4 karakteri
+görünür. Sekmeyi kapattığınızda kaybolurlar. `credentials.py` modülünde hiçbir kalıcılık
+çağrısı bulunmadığı bir testle korunur (ADR-012).
+
+CLI ve Docker için ortam değişkenleri (`ANTHROPIC_API_KEY` vb.) **okuma yönünde** yedek
+olarak çalışmaya devam eder.
+
+### 💵 Maliyet ve fiyat tablosu
+
+Fiyatlar `config/model_prices.json` dosyasında, kaynak ve tarihiyle tutulur ve **elle**
+güncellenir. Şu an yalnız **Anthropic fiyatları doğrulanmış kaynaktan** girilidir;
+OpenAI ve Gemini `null`'dur — bu modellerde arayüz **"fiyat girilmedi"** yazar,
+`$0` **yazmaz**. Toplamların yanında kaç koşunun fiyatının bilindiği (`2/4 koşu`)
+ayrıca gösterilir (ADR-013).
+
+### 📊 Ölçüm verisi hakkında
+
+Her soru — reddedilenler dahil — `storage/metrics.db` içine kaydedilir: model, süre,
+token, maliyet, atıf sayısı, kapı kararı. Reddedilenlerin de kaydedilmesi kasıtlıdır;
+"konu dışı filtresi ne kadar isabetli" sorusu ancak böyle cevaplanabilir.
+⚠️ **Soru metinleri de kaydedilir** — gerçek bir dağıtımda bu kişisel veri içerebilir.
+
+---
 
 ### Terminal arayüzü
 

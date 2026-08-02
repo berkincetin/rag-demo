@@ -8,12 +8,31 @@ services:
     volumes:
       - ./data:/app/data
       - ./storage:/app/storage
-    depends_on: [ollama]
+    depends_on:
+      ollama:
+        condition: service_started
+      ollama-init:
+        condition: service_completed_successfully
 
   ollama:
     image: ollama/ollama:latest
     ports: ["11434:11434"]
     volumes: ["ollama:/root/.ollama"]
+
+  # Pulls the chat model once, so no manual `docker compose exec … ollama pull`
+  # is needed. The named volume keeps it across restarts.
+  ollama-init:
+    image: ollama/ollama:latest
+    depends_on: [ollama]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint:
+      - sh
+      - -c
+      - |
+        until ollama list >/dev/null 2>&1; do echo "ollama bekleniyor..."; sleep 2; done
+        ollama pull "${LLM_MODEL:-qwen2.5:7b-instruct}"
+    restart: "no"
 
 volumes:
   ollama: {}

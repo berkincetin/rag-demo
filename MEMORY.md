@@ -330,6 +330,15 @@ Tool sonucu bağlama girince 7B model CPU'da 120s'i aşıyor → `ReadTimeout`. 
 | **Model sorguyu yanlış yazsa bile retrieval tutuyor** | Model `"yılınık izin"` diye hatalı sorgu üretti, doğru chunk'lar yine geldi — `fold_tr` + BM25 6-karakter kırpmasının yan faydası |
 | **Kaynak belgede yazım hatası var** | `ik_surecleri_politikası.docx` başlığı gerçekten `5.1 Yıllık Izin Haklarıq` (sondaki `q` belgede var). Loader hatası **değil**; atıf etiketi belgeyi birebir yansıttığı için düzeltilmedi |
 
+### Task 13 — CLI + Streamlit (2026-08-02)
+
+| Konu | Öğrenilen |
+|---|---|
+| **CLI uçtan uca doğrulandı** | `python -m src.rag.cli "Direktör ... yakıt limiti nedir?"` → **"1.500 TL/ay"** + `arac_kullanim_proseduru.docx — 3. ARAC TAHSIS POLITIKASI`. Bu tek çıktı **DOCX tablo çıkarımı → chunking → retrieval → agent → atıf** zincirinin tamamını kanıtlıyor (demo sorusu 3) |
+| **Streamlit tarayıcıda test edildi** | Konu dışı soru → red metni + `Kaynaklar (0)` + `Araç çağrıları (0)`. `Vitatin95` → cevap + `Kaynaklar (1)` + trace tablosu (`search_documents`, 1763 karakter, `injected: false`). Türkçe karakterler doğru render ediliyor |
+| **İlk soru yavaş, sonrakiler hızlı** | `@st.cache_resource` sayesinde indeks + embedding modeli bir kez yükleniyor. İlk soruda ~20s ek gecikme var, README'de belirtilmeli |
+| **`build_agent` eşikleri config'den alıyor** | Task 9'da eklenen `min_bm25` buraya da geçirildi; aksi halde retriever varsayılanı kullanılır ve `.env` ayarı sessizce yok sayılırdı |
+
 ---
 
 ## 5. Açık Sorular / Bekleyen Kararlar

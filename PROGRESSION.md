@@ -5,10 +5,10 @@
 
 **Son güncelleme:** 2026-08-02
 **Aktif bölüm:** Bölüm 1 — RAG Agent
-**Aktif task:** Task 13 — CLI + Streamlit (devam ediyor: testler ✅, elle doğrulama kaldı)
+**Aktif task:** Task 14 — Demo notebook, Docker, README (henüz başlamadı)
 **Okunacak dosya:** [docs/superpowers/plans/rag-agent/00-overview.md](docs/superpowers/plans/rag-agent/00-overview.md)
-+ [13-frontends.md](docs/superpowers/plans/rag-agent/13-frontends.md)
-**Sıradaki somut adım:** Task 13 / Step 5 — `python -m src.rag.cli "..."` gerçek indeksle çalıştır
++ [14-demo-docker-readme.md](docs/superpowers/plans/rag-agent/14-demo-docker-readme.md)
+**Sıradaki somut adım:** Task 14 / Step 1 — `notebooks/demo.ipynb` 8 senaryoyla oluştur
 
 > ⚠️ **Eşik değerleri değişti:** `MIN_COSINE=0.72` **geçersiz**. Kalibre edilmiş değerler
 > `MIN_COSINE=0.80` + `MIN_BM25=5.0` (VE kapısı). Gerekçe ve ölçüm tablosu MEMORY.md Task 9.
@@ -24,7 +24,7 @@
 | Aşama | Durum |
 |---|---|
 | Planlama (case analizi, veri keşfi, PRD/TRD/task planları) | ✅ Tamamlandı — 2026-08-01 |
-| Bölüm 1 — RAG Agent | 🔄 Devam ediyor (12/14 task) |
+| Bölüm 1 — RAG Agent | 🔄 Devam ediyor (13/14 task) |
 | Bölüm 2 — Satış Analizi | ⬜ Başlamadı (0/7 faz) — Bölüm 1 teslim edilebilir olmadan başlanmaz |
 
 Legend: ⬜ başlamadı · 🔄 devam ediyor · ✅ tamamlandı · ⚠️ engellendi
@@ -50,7 +50,7 @@ Kavramsal arka plan: [docs/bolum1-rag/UYGULAMA-PLANI.md](docs/bolum1-rag/UYGULAM
 | 10 | Tool'lar + promptlar | [10](docs/superpowers/plans/rag-agent/10-tools-prompts.md) | ✅ | 10 unit ✅ %94 cov | `feat(tools)` |
 | 11 | LLM sağlayıcıları | [11](docs/superpowers/plans/rag-agent/11-llm-providers.md) | ✅ | 6 unit + 2 skip (SDK yok) ✅ | `feat(llm)` |
 | 12 | Agent döngüsü + güvenlik ağı | [12](docs/superpowers/plans/rag-agent/12-agent.md) | ✅ | 7 unit ✅ %100 cov + uçtan uca | `feat(agent)` |
-| 13 | CLI + Streamlit | [13](docs/superpowers/plans/rag-agent/13-frontends.md) | ⬜ | — | — |
+| 13 | CLI + Streamlit | [13](docs/superpowers/plans/rag-agent/13-frontends.md) | ✅ | 3 unit ✅ + CLI & UI elle doğrulandı | `feat(cli)` |
 | 14 | Demo, Docker, README | [14](docs/superpowers/plans/rag-agent/14-demo-docker-readme.md) | ⬜ | — | — |
 | — | Doğrulama listesi | [99](docs/superpowers/plans/rag-agent/99-verification-checklist.md) | ⬜ | — | — |
 
@@ -203,3 +203,4 @@ Her faz kapandığında buraya bir satır eklenir.
 | 2026-08-02 | 1 | Task 10 — Tool'lar + promptlar | `feat(tools)` | 85 passed, %97,80 cov | 3 tool + Türkçe sistem promptu; `prompts.py` Task 12'de kapsanacak |
 | 2026-08-02 | 1 | Task 11 — LLM sağlayıcıları | `feat(llm)` | 91 passed + 2 skipped, %97,80 cov | Ollama smoke test ✅ ("Merhaba!"). ⚠️ Yerel etiket `-q4_K_M`; SYSTEM_PROMPT tool çağrısını engelliyor (Task 12'ye devredildi) |
 | 2026-08-02 | 1 | Task 12 — Agent döngüsü | `feat(agent)` | 103 passed + 2 skipped, %95,05 cov | 3 kök neden: kısa prompt + `CITATION_REMINDER` tool sonucunda, tool çağrılmazsa **bağlam enjeksiyonu**, timeout 120s→600s. Uçtan uca doğrulandı |
+| 2026-08-02 | 1 | Task 13 — CLI + Streamlit | `feat(cli)` | 103 passed + 2 skipped, %95,05 cov | CLI: DOCX tablosundan `1.500 TL/ay` ✅. Streamlit tarayıcıda test edildi: konu dışı → Kaynaklar(0)/Araç(0); Vitatin95 → 1 kaynak + trace tablosu |

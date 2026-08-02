@@ -230,3 +230,6 @@ figures/
 
 # Claude Code local config and project-scoped skills (superpowers, MIT — not part of delivery)
 .claude/
+
+# Teslim paketi (git archive + data/ ile elle üretilir)
+rag-demo.zip

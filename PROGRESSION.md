@@ -68,7 +68,7 @@ Kavramsal arka plan: [docs/bolum1-rag/UYGULAMA-PLANI.md](docs/bolum1-rag/UYGULAM
 | README: 3 komut, ASCII mimari, gerekçeler, zorluklar, sınırlılıklar | ✅ hepsi |
 | `docker compose up` sistemi ayağa kaldırıyor | ✅ HTTP 200 |
 | `pytest --cov --cov-fail-under=70` geçiyor | ✅ 103 passed, %95,05 |
-| Teslim ZIP'i `data/` içeriyor ve sıfırdan çalışıyor | ⏳ ZIP oluşturulacak |
+| Teslim ZIP'i `data/` içeriyor ve sıfırdan çalışıyor | ✅ `rag-demo.zip` (88 girdi, 6 belge). Temiz klasöre açılıp `ingest.py` çalıştırıldı: 276 chunk, 92,8 sn |
 
 **Bağımlılık zinciri:** 1 → 2 → {3, 4, 5} → 6 → 7 → 8 → 9 → {10, 11} → 12 → 13 → 14
 

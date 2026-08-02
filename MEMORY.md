@@ -190,6 +190,18 @@ Kodun bunlarla eşleşmesi beklenir; eşleşmiyorsa **önce kodu** sorgula.
 | **Mevcut birim testi bu hatayı yakalayamıyordu** | `test_long_section_splits...` 400'er karakterlik 6 paragraf kullanıyor; hepsi sınırın altında olduğu için hatalı dal hiç çalışmıyor. Ders: sınır testinde **tek parçanın sınırı aştığı** durum ayrıca test edilmeli |
 | **Chunk sayısı beklentisi doğrulandı** | Düzeltme sonrası 276, planın 250–450 aralığında. Task 6'da not düşülen "144 bin karakter tahminden yüksek" endişesi sorun çıkarmadı |
 
+### Task 8 — İndeks + ingest (2026-08-02)
+
+| Konu | Öğrenilen |
+|---|---|
+| **Ingest gerçek çıktısı** | 219 bölüm → **276 chunk**, **50,5 saniye** (model önbellekteyken, CPU). Dosya başına: Taksonomi 100 · Duxet **63** · SSS 45 · Aksef **34** · İK 19 · Araç 15. PDF'ler bölüm sayısının (20+20) çok üstünde chunk veriyor — Task 7'nin `_hard_split`'i burada görünür oluyor |
+| **e5 önek şeması** | Belgeler `passage: `, sorgular `query: ` önekiyle gömülüyor. Task 9'da sorgu tarafında **aynı öneki kullanmak zorunlu** — unutulursa benzerlik skorları sistematik olarak düşer ve `MIN_COSINE=0.72` eşiği her şeyi eler |
+| **Model indirme maliyeti** | `intfloat/multilingual-e5-base` ilk çalıştırmada ~1,1 GB indiriyor, `~/.cache/huggingface` altına. Windows'ta symlink uyarısı veriyor (zararsız, disk biraz daha fazla yer kaplar) |
+| **Chroma telemetri hatası zararsız** | `Failed to send telemetry event ... capture() takes 1 positional argument but 3 were given` — chromadb/posthog sürüm uyumsuzluğu, indeksleme etkilenmiyor. `ANONYMIZED_TELEMETRY=False` ile susturulabilir |
+| **Yeniden kurma idempotent** | `build_index` her çağrıda koleksiyonu silip yeniden yaratıyor; iki kez çalıştırınca chunk sayısı iki katına çıkmıyor (test ile korunuyor) |
+| **`chunks.jsonl` = tek gerçek kaynağı** | Chunk metni/atıf etiketi hem Chroma'da hem JSONL'de. Retriever JSONL'i okuyor, Chroma yalnız vektör araması için. `Chunk(**json.loads(line))` round-trip çalışıyor |
+| **Pydantic uyarısı** | `chromadb` 50 adet `PydanticDeprecatedSince211` uyarısı üretiyor. Kütüphane içi, bizim kodla ilgisi yok |
+
 ---
 
 ## 5. Açık Sorular / Bekleyen Kararlar

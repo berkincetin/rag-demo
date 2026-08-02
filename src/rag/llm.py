@@ -13,6 +13,7 @@ from typing import Any, Protocol
 import requests
 
 from src.rag.config import Config
+from src.rag.models import TokenUsage  # re-exported: callers import it from here
 
 # A 7B model on CPU takes minutes on the agent loop's second turn, where the
 # prompt carries the retrieved passages. 120s was measured to be too short.
@@ -29,33 +30,6 @@ class ToolCall:
     id: str
     name: str
     arguments: dict[str, Any]
-
-
-@dataclass(frozen=True)
-class TokenUsage:
-    """Tokens a provider reported for one call.
-
-    `None` means the provider did not report the number — which is not the same
-    as reporting zero, so the fields are never defaulted to 0.
-    """
-
-    input_tokens: int | None = None
-    output_tokens: int | None = None
-
-    def __add__(self, other: "TokenUsage") -> "TokenUsage":
-        """Sum across turns, treating unreported values as absent, not zero."""
-        return TokenUsage(
-            _add_optional(self.input_tokens, other.input_tokens),
-            _add_optional(self.output_tokens, other.output_tokens),
-        )
-
-
-def _add_optional(left: int | None, right: int | None) -> int | None:
-    if left is None:
-        return right
-    if right is None:
-        return left
-    return left + right
 
 
 @dataclass

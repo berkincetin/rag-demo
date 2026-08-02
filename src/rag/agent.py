@@ -6,17 +6,9 @@ cites nothing. See docs/02-karar-kaydi.md ADR-008.
 """
 
 import re
-from typing import Any
+import time
 
 from src.rag.models import Answer
-from src.rag.prompts import (
-    CITATION_REMINDER,
-    CITATION_REPAIR,
-    NO_INFO_TEMPLATE,
-    REFUSAL_TEMPLATE,
-    SYSTEM_PROMPT,
-)
-from src.rag.tools import TOOL_SCHEMAS
 
 _CITATION_MARKER = re.compile(r"\[(\d+)\]")
 _SOURCE_LINE = re.compile(r"^\[(\d+)\]\s+(.+)$", re.MULTILINE)
@@ -37,86 +29,70 @@ def extract_citations(text: str, tool_outputs: list[str]) -> list[str]:
 
 
 class Agent:
-    def __init__(self, retriever, toolbox, llm, max_tool_turns: int = 3) -> None:
+    """Facade over the LangGraph state machine in `graph.py`.
+
+    The public surface is deliberately unchanged from the hand-written loop it
+    replaced, so the CLI, Streamlit, the demo notebook, and the smoke test do
+    not need to know the internals moved.
+    """
+
+    def __init__(self, retriever, toolbox, llm, max_tool_turns: int = 3, metrics=None) -> None:
+        from src.rag.graph import build_graph
+
         self.retriever = retriever
         self.toolbox = toolbox
         self.llm = llm
         self.max_tool_turns = max_tool_turns
+        self.metrics = metrics
+        self._graph = build_graph(retriever, toolbox, llm, max_tool_turns)
 
     def answer(self, question: str) -> Answer:
         """Answer a question, or refuse when the knowledge base cannot support one."""
-        hits = self.retriever.search(question, top_k=5)
-        if not self.retriever.is_confident(hits):
-            return Answer(text=REFUSAL_TEMPLATE)
+        from src.rag.graph import initial_state
 
-        messages: list[dict[str, Any]] = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": question},
-        ]
-        trace: list[dict[str, Any]] = []
-        outputs: list[str] = []
-        final_text = ""
+        started = time.perf_counter()
+        state = self._graph.invoke(initial_state(question))
+        latency_ms = int((time.perf_counter() - started) * 1000)
 
-        for _ in range(self.max_tool_turns):
-            response = self.llm.chat(messages, TOOL_SCHEMAS)
-
-            if not response.tool_calls:
-                if not outputs:
-                    # The model answered without consulting the documents. Small
-                    # local models skip the tool call unpredictably, so retrieve
-                    # on its behalf rather than losing the answer to layer 3.
-                    self._add_tool_result(
-                        messages,
-                        trace,
-                        outputs,
-                        name="search_documents",
-                        arguments={"query": question},
-                        injected=True,
-                    )
-                    continue
-                final_text = response.text or ""
-                break
-
-            for call in response.tool_calls:
-                self._add_tool_result(
-                    messages, trace, outputs, name=call.name, arguments=call.arguments
-                )
-
-        citations = extract_citations(final_text, outputs)
-        if not citations and outputs and final_text:
-            # The passages were retrieved but the answer carries no [n] marker.
-            # Sampling makes this intermittent, so ask once, explicitly, before
-            # discarding an answer that may well be correct.
-            messages.append({"role": "assistant", "content": final_text})
-            messages.append({"role": "user", "content": CITATION_REPAIR})
-            final_text = self.llm.chat(messages, TOOL_SCHEMAS).text or final_text
-            citations = extract_citations(final_text, outputs)
-
-        if not citations:
-            return Answer(text=NO_INFO_TEMPLATE, tool_trace=trace)
-        return Answer(text=final_text, citations=citations, tool_trace=trace)
-
-    def _add_tool_result(
-        self,
-        messages: list[dict[str, Any]],
-        trace: list[dict[str, Any]],
-        outputs: list[str],
-        *,
-        name: str,
-        arguments: dict[str, Any],
-        injected: bool = False,
-    ) -> None:
-        """Run one tool and feed its output back into the conversation.
-
-        The citation instruction rides on the tool result rather than the system
-        prompt: measured on qwen2.5:7b-instruct, every extra sentence in the
-        system prompt suppresses the initial tool call, but instructions that
-        arrive after the tool has run do not.
-        """
-        output = self.toolbox.run(name, arguments)
-        outputs.append(output)
-        trace.append(
-            {"name": name, "arguments": arguments, "chars": len(output), "injected": injected}
+        answer = Answer(
+            text=state["final_text"],
+            citations=state["citations"],
+            tool_trace=state["trace"],
+            usage=state["usage"],
+            latency_ms=latency_ms,
         )
-        messages.append({"role": "assistant", "content": f"[tool: {name}]"})
-        messages.append({"role": "user", "content": f"{output}\n\n{CITATION_REMINDER}"})
+        self._record(question, state, answer)
+        return answer
+
+    def _record(self, question: str, state: dict, answer: Answer) -> None:
+        if self.metrics is None:
+            return
+
+        from src.rag.metrics import RunRecord
+        from src.rag.pricing import estimate_cost
+
+        model_id = getattr(self.llm, "model", "bilinmiyor")
+        self.metrics.record(
+            RunRecord(
+                model_id=model_id,
+                provider=_provider_of(model_id),
+                question=question,
+                latency_ms=answer.latency_ms,
+                input_tokens=answer.usage.input_tokens,
+                output_tokens=answer.usage.output_tokens,
+                cost_usd=estimate_cost(
+                    model_id, answer.usage.input_tokens, answer.usage.output_tokens
+                ),
+                citation_count=len(answer.citations),
+                gate_passed=state["gate_passed"],
+                tool_calls=len(state["trace"]),
+                repaired=state["repaired"],
+            )
+        )
+
+
+def _provider_of(model_id: str) -> str:
+    from src.rag.catalog import get_model
+
+    model = get_model(model_id)
+    return model.provider if model else "ollama"

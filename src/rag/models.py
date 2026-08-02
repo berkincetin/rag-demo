@@ -41,6 +41,33 @@ class SearchHit:
     bm25: float
 
 
+@dataclass(frozen=True)
+class TokenUsage:
+    """Tokens a provider reported for one call.
+
+    `None` means the provider did not report the number — which is not the same
+    as reporting zero, so the fields are never defaulted to 0.
+    """
+
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+
+    def __add__(self, other: "TokenUsage") -> "TokenUsage":
+        """Sum across turns, treating unreported values as absent, not zero."""
+        return TokenUsage(
+            _add_optional(self.input_tokens, other.input_tokens),
+            _add_optional(self.output_tokens, other.output_tokens),
+        )
+
+
+def _add_optional(left: int | None, right: int | None) -> int | None:
+    if left is None:
+        return right
+    if right is None:
+        return left
+    return left + right
+
+
 @dataclass
 class Answer:
     """Final agent output."""
@@ -48,3 +75,5 @@ class Answer:
     text: str
     citations: list[str] = field(default_factory=list)
     tool_trace: list[dict[str, Any]] = field(default_factory=list)
+    usage: TokenUsage = field(default_factory=TokenUsage)
+    latency_ms: int = 0

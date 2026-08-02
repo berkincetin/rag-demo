@@ -1,0 +1,80 @@
+[
+  {
+    "question": "Yıllık izin talebimi nasıl yaparım?",
+    "expect_answer": true,
+    "expect_source": "calisan_sss_rehberi",
+    "expect_evidence": null
+  },
+  {
+    "question": "İşe alım süreci kaç aşamadan oluşur?",
+    "expect_answer": true,
+    "expect_source": "ik_surecleri",
+    "expect_evidence": null
+  },
+  {
+    "question": "Direktör seviyesindeki bir çalışanın aylık yakıt limiti nedir?",
+    "expect_answer": true,
+    "expect_source": "arac_kullanim",
+    "expect_evidence": "1.500 TL/ay"
+  },
+  {
+    "question": "Havuz aracı nasıl talep edilir?",
+    "expect_answer": true,
+    "expect_source": "arac_kullanim",
+    "expect_evidence": null
+  },
+  {
+    "question": "Aksef 500 mg'ın kontrendikasyonları nelerdir?",
+    "expect_answer": true,
+    "expect_source": "Aksef",
+    "expect_evidence": null
+  },
+  {
+    "question": "Duxet'in gebelikte kullanımı hakkında ne yazıyor?",
+    "expect_answer": true,
+    "expect_source": "Duxet",
+    "expect_evidence": null
+  },
+  {
+    "question": "Vitatin95 ürününün terapötik sistemi ve ürün müdürü kim?",
+    "expect_answer": true,
+    "expect_source": "Anonim_Urun_Taksonomi",
+    "expect_evidence": null
+  },
+  {
+    "question": "Şirketin 2027 yılı kâr hedefi nedir?",
+    "expect_answer": false,
+    "expect_source": null,
+    "expect_evidence": null
+  },
+  {
+    "question": "Bugün hava nasıl olacak?",
+    "expect_answer": false,
+    "expect_source": null,
+    "expect_evidence": null
+  },
+  {
+    "question": "En sevdiğin film hangisi?",
+    "expect_answer": false,
+    "expect_source": null,
+    "expect_evidence": null
+  },
+  {
+    "question": "Bitcoin fiyatı ne kadar?",
+    "expect_answer": false,
+    "expect_source": null,
+    "expect_evidence": null
+  },
+  {
+    "question": "Türkiye'nin başkenti neresidir?",
+    "expect_answer": false,
+    "expect_source": null,
+    "expect_evidence": null
+  },
+  {
+    "question": "Bana bir şiir yaz",
+    "expect_answer": false,
+    "expect_source": null,
+    "expect_evidence": null
+  }
+]

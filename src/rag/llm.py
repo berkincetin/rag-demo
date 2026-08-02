@@ -14,7 +14,9 @@ import requests
 
 from src.rag.config import Config
 
-_TIMEOUT_SECONDS = 120
+# A 7B model on CPU takes minutes on the agent loop's second turn, where the
+# prompt carries the retrieved passages. 120s was measured to be too short.
+_DEFAULT_TIMEOUT_SECONDS = 600
 
 
 @dataclass
@@ -59,15 +61,18 @@ def _as_dict(value: Any) -> dict[str, Any]:
 
 
 class OllamaClient:
-    def __init__(self, model: str, base_url: str | None = None) -> None:
+    def __init__(self, model: str, base_url: str | None = None, timeout: int | None = None) -> None:
         self.model = model
         self.base_url = base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        self.timeout = timeout or int(
+            os.getenv("LLM_TIMEOUT_SECONDS", str(_DEFAULT_TIMEOUT_SECONDS))
+        )
 
     def chat(self, messages, tools=None) -> LLMResponse:
         body: dict[str, Any] = {"model": self.model, "messages": messages, "stream": False}
         if tools:
             body["tools"] = [{"type": "function", "function": schema} for schema in tools]
-        response = requests.post(f"{self.base_url}/api/chat", json=body, timeout=_TIMEOUT_SECONDS)
+        response = requests.post(f"{self.base_url}/api/chat", json=body, timeout=self.timeout)
         response.raise_for_status()
         return parse_ollama_response(response.json())
 

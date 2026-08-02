@@ -276,6 +276,60 @@ belgede yok) da doğru şekilde eleniyor (kosinüs 0,778).
 | **CPU'da 7B yavaş** | Tek tool-calling isteği ~60–75 saniye. 4 senaryoluk probe 300s timeout'u aştı. Task 12/14'te LLM çağıran her adım için bunu hesaba kat — demo notebook'u dakikalar sürecek |
 | 🚨 **SYSTEM_PROMPT tool çağrısını engelliyor** | Ölçüldü: sistem promptu **olmadan** model `search_documents`'i çağırıyor; **mevcut SYSTEM_PROMPT ile çağırmıyor**, doğrudan genel bilgiden cevap veriyor. Sebep: Kural 3 ("araçlardan gelen içerikte cevap yoksa 'bilgi bulamadım' de") modele daha 1. turda kullanabileceği bir kaçış yolu veriyor ve qwen2.5-7b onu kullanıyor. Prompt'a "önce aracı çağır" eklemek **düzeltmedi**. **Task 12 bunu çözmek zorunda** — muhtemelen bağlamı agent'ın kendisi önceden çekmeli (skor kapısı zaten LLM'den önce çalışıyor), modelin tool çağırma inisiyatifine güvenilmemeli |
 
+### Task 12 — Agent döngüsü + güvenlik ağı (2026-08-02)
+
+Birim testleri (scripted LLM) ilk denemede geçti ama **uçtan uca çalışmıyordu**. Gerçek
+LLM ile denemeden "bitti" denseydi teslim edilen sistem her soruya "bilgi bulamadım"
+diyecekti.
+
+#### 🚨 Kök neden 1: Uzun sistem promptu tool çağrısını öldürüyor
+
+Ölçüm (qwen2.5:7b-instruct-q4_K_M, aynı sorular):
+
+| Sistem promptu | Tool çağrıldı mı? |
+|---|---|
+| Prompt yok | ✅ |
+| Planın 5 kurallı numaralı listesi | ❌ |
+| Numaralı liste + "İlk adımın DAİMA search_documents" | ❌ |
+| **3 satırlık, yalnız tool direktifi** | ✅ (iki soruda da) |
+| 3 satır + atıf cümlesi eklenince | ❌ (tekrar bozuldu) |
+
+Sorun tek bir kural değil, **promptun uzunluğu/liste biçimi**. Model son derece hassas:
+tool direktifinin dışındaki her ek cümle tool çağrısını bastırıyor.
+
+**Çözüm — talimatı zamanda ayır:**
+- `SYSTEM_PROMPT` yalnız 3 satır: "önce search_documents çağır".
+- Atıf/temellendirme talimatı (`CITATION_REMINDER`) **tool sonucunun yanında** gönderiliyor.
+  Tool zaten çalıştıktan sonra gelen talimat çağrıyı bastıramıyor.
+- Prompttan çıkarılan kurallar kaybolmadı: konu dışı reddi **1. katman** (skor kapısı,
+  LLM'den önce), "kaynaksız cevap yok" **3. katman** (atıf post-check) tarafından
+  deterministik olarak zorlanıyor. Yani promptun *rica ettiği* şeyi güvenlik ağı *dayatıyor*.
+
+#### 🚨 Kök neden 2: Model tool çağırmazsa cevap çöpe gidiyordu
+
+Model tool çağırmadığında `outputs` boş kalıyor → atıf çıkmıyor → 3. katman her cevabı
+`NO_INFO_TEMPLATE` ile değiştiriyordu. Prompt düzeltilse bile bu davranış modele bağlı
+kalırdı. **Çözüm:** agent, ilk turda hiç tool çağrılmamışsa aramayı **kendisi** yapıyor
+(`_add_tool_result(..., injected=True)`) ve trace'e `injected: True` diye **dürüstçe**
+kaydediyor. Böylece sistem model kaprisinden bağımsız.
+
+#### Kök neden 3: 120 saniyelik timeout yetmiyor
+
+Tool sonucu bağlama girince 7B model CPU'da 120s'i aşıyor → `ReadTimeout`. Varsayılan
+**600s** yapıldı, `LLM_TIMEOUT_SECONDS` ile ayarlanabilir.
+
+#### Uçtan uca doğrulanmış çıktı
+
+`"Yıllık izin talebimi nasıl yaparım?"` → model **kendisi** tool çağırdı (`injected: False`),
+2.280 karakter aldı, 3 gerçek kaynağa atıf verdi ve İK belgesindeki gerçek rakamları
+(14/20/26 iş günü) döndürdü. `"Bugün hava nasıl olacak?"` → red, boş trace.
+
+| Konu | Öğrenilen |
+|---|---|
+| **Scripted LLM testleri yeterli değil** | 7 birim testi yeşilken sistem uçtan uca bozuktu. LLM'li her task'ta **gerçek modelle bir kez** çalıştırmadan "bitti" denmemeli |
+| **Model sorguyu yanlış yazsa bile retrieval tutuyor** | Model `"yılınık izin"` diye hatalı sorgu üretti, doğru chunk'lar yine geldi — `fold_tr` + BM25 6-karakter kırpmasının yan faydası |
+| **Kaynak belgede yazım hatası var** | `ik_surecleri_politikası.docx` başlığı gerçekten `5.1 Yıllık Izin Haklarıq` (sondaki `q` belgede var). Loader hatası **değil**; atıf etiketi belgeyi birebir yansıttığı için düzeltilmedi |
+
 ---
 
 ## 5. Açık Sorular / Bekleyen Kararlar

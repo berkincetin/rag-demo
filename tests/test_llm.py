@@ -83,3 +83,15 @@ def test_parse_ollama_response_extracts_tool_calls():
 
 def test_llm_response_reports_whether_it_wants_tools():
     assert LLMResponse(text="hi", tool_calls=[]).wants_tools is False
+
+
+def test_ollama_timeout_is_configurable(monkeypatch):
+    # A 7B model on CPU needs well over 120s once tool output is in the context;
+    # the second turn of the agent loop timed out at the original hardcoded value.
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "999")
+
+    assert OllamaClient(model="m").timeout == 999
+
+
+def test_ollama_timeout_default_allows_a_cpu_second_turn():
+    assert OllamaClient(model="m").timeout >= 300

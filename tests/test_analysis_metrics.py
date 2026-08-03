@@ -147,3 +147,16 @@ def test_fiyat_sapmasi_ayni_fiyatta_sifir():
     )
 
     assert fiyat_sapmasi(df)["cv"].iloc[0] == pytest.approx(0.0)
+
+
+def test_mevsimsellik_satis_gormeyen_aylari_gecmis_saymiyor():
+    # 🚨 `C Pazarı/Ürün 1` kırpma sonrası 28 satır taşıyor ama yalnız BİR ayında
+    # satış var. Satır sayısına bakan bir eşik bunu "yeterli geçmiş" sayıyor ve STL
+    # tek sıçramayı mevsimsellik diye raporluyordu: güç 0,987, zirve indeksi 8,72.
+    # Uydurulmuş mevsimsellik, eksik veriden daha kötüdür.
+    aylar = pd.date_range("2024-01-01", periods=28, freq="MS")
+    degerler = [1.0] + [0.0] * 27
+    seri = pd.Series(degerler, index=aylar)
+
+    assert mevsimsel_indeks(seri) is None
+    assert mevsimsellik_gucu(seri) is None

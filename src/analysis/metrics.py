@@ -90,11 +90,21 @@ def mevsimsellik_gucu(seri: pd.Series) -> float | None:
 
 
 def _stl_bileseni(seri: pd.Series):
-    """STL ayrıştırması; seri kısa veya sabitse `None`."""
+    """STL ayrıştırması; bilgilendirici geçmiş yetersizse `None`.
+
+    Eşik **satış görülen ay** sayısına bakar, satır sayısına değil. Fark ölçüldü:
+    `C Pazarı/Ürün 1` kırpma sonrası 28 satır taşıyor ama yalnız bir ayında satış
+    var; satır sayısına bakan bir eşik bunu kabul ediyor ve STL o tek sıçramayı
+    mevsimsellik olarak raporluyordu (güç 0,987, zirve indeksi 8,72). Uydurulmuş
+    mevsimsellik, "hesaplanamadı" demekten daha kötüdür.
+    """
     from statsmodels.tsa.seasonal import STL
 
     temiz = seri.dropna()
-    if len(temiz) < MEVSIMSELLIK_MIN_AY or temiz.nunique() <= 1:
+    satisli_ay = int((temiz > 0).sum())
+    if len(temiz) < MEVSIMSELLIK_MIN_AY or satisli_ay < MEVSIMSELLIK_MIN_AY:
+        return None
+    if temiz.nunique() <= 1:
         return None
     return STL(temiz, period=_PERIYOT, robust=True).fit()
 

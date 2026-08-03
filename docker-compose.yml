@@ -16,7 +16,11 @@ services:
 
   ollama:
     image: ollama/ollama:latest
-    ports: ["11434:11434"]
+    # Deliberately not published on the host. `scripts/setup.py` tells users to
+    # install Ollama locally, and a local Ollama already owns host port 11434 —
+    # publishing it here made `docker compose up` fail to start on exactly the
+    # machines the setup script prepares. `rag` reaches it by service name.
+    expose: ["11434"]
     volumes: ["ollama:/root/.ollama"]
 
   # Pulls the chat model once, so no manual `docker compose exec … ollama pull`

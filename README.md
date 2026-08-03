@@ -45,11 +45,31 @@ yeterlidir; ilgili SDK'yı ayrıca kurmanız gerekir (`pip install anthropic`).
 
 | Sayfa | Ne yapar |
 |---|---|
-| 💬 **Sohbet** | Soru sorar; cevabın altında **aktif model**, süre, token ve maliyet gösterir. Kaynaklar ve araç izi panelleri korunur |
+| 💬 **Sohbet** | Soru sorar; cevabın altında **aktif model**, süre, giriş/çıkış token'ı, maliyet ve yerel modelde **tepe CPU / RAM / GPU VRAM** gösterir. Kenar çubuğunda ad alanı ve sohbet belleği vardır. Kaynaklar ve araç izi panelleri korunur |
 | ⚙️ **Sağlayıcılar** | Anthropic / OpenAI / Gemini anahtarı girilir, aktif model seçilir |
 | 📦 **Yerel Modeller** | Ollama modellerini listeler, ilerleme çubuğuyla indirir, siler |
-| 📊 **Metrikler** | Model bazında koşu sayısı, ortalama süre, atıf, kapı isabeti ve maliyet; geçmiş tablosu |
+| 📊 **Metrikler** | Model bazında koşu sayısı, ortalama süre, toplam giriş/çıkış token'ı, atıf, kapı isabeti, tepe kaynak tüketimi ve maliyet; geçmiş tablosu |
 | 🎯 **Değerlendirme** | Seçilen modelleri 13 soruluk sabit setle karşılaştırır |
+
+### 🧠 Sohbet belleği ve kullanıcı adı
+
+Sohbet **son 5 turu** hatırlar, böylece *"peki ya müdür seviyesinde?"* gibi takip soruları
+çalışır. Buradaki incelik şu: bu metin tek başına hiçbir belgeye benzemediği için skor
+kapısı onu konu dışı sayıp **reddederdi**. Bu yüzden yalnızca **arama sorgusu** bir önceki
+soruyla genişletilir; modele giden mesajlarda kullanıcının kendi yazdığı cümle durur.
+Reddedilen cevaplar belleğe **girmez** — girseydi bir sonraki aramayı kirletirlerdi.
+
+Kenar çubuğundaki ad alanı sistem promptunun sonuna **tek cümle** ekler. Ad boşken prompt
+birebir eski hâlindedir (bunu bir test korur), çünkü prompta eklenen her fazladan cümlenin
+yerel 7B modelde araç çağrısını bastırabildiği daha önce ölçüldü. Ad **oturumda** kalır;
+ölçüm veritabanına yazılmaz.
+
+### 🖥️ Kaynak tüketimi
+
+Yerel modellerde her cevap için **tepe CPU %**, **tepe RAM** ve Ollama'nın `/api/ps`
+ucundan okunan **GPU VRAM** kaydedilir. Ölçülemeyen değer `—` olarak gösterilir; `0`
+**yazılmaz**. `GPU 0 MB` ile "ölçülemedi" farklı iki bilgidir: birincisi modelin CPU'da
+çalıştığı anlamına gelir.
 
 ### 🔒 Anahtarlar nerede tutuluyor
 
@@ -303,12 +323,24 @@ jupyter lab notebooks/demo.ipynb
 
 ```bash
 docker compose up --build
-docker compose exec ollama ollama pull qwen2.5:7b-instruct   # ilk kullanımda, ~4,7 GB
 ```
+
+Elle `ollama pull` **gerekmez**: `ollama-init` servisi modeli kendisi çeker (ilk `up`
+~4,7 GB indirir, uzun sürer) ve `rag` servisi indirme bitene kadar bekler.
+
+> ⚠️ **Yerel Ollama'yı önce durdurun.** Konteyner Ollama'sı ile makinedeki Ollama aynı
+> ~4,7 GB modeli aynı anda belleğe alır. 16 GB'lık bir makinede bu ölçüldü: boş RAM
+> 1 GB'ın altına indi ve **Docker daemon çöktü**. Docker'ı kullanacaksanız yerel Ollama
+> servisini kapatın; yerel kurulumu kullanacaksanız `docker compose down` yapın.
 
 `localhost:8501` arayüzü açar; `ollama` ayrı konteynerde çalışır ve `rag` servisi ona
 `http://ollama:11434` üzerinden erişir. Model, adlandırılmış `ollama` volume'ünde kalıcıdır;
 ikinci `up` çağrısında tekrar indirilmez.
+
+Konteynerdeki Ollama'nın portu **bilerek host'a açılmıyor**: makinede yerel bir Ollama
+kuruluysa (kurulum betiği zaten onu öneriyor) 11434 portu doluydu ve `docker compose up`
+hiç başlamıyordu. Konteynere host'tan erişmek gerekirse `docker compose exec ollama …`
+kullanılabilir.
 
 `.dockerignore` sanal ortamı, indeksi ve planlama dokümanlarını build bağlamının dışında
 tutar — imaj **8,98 GB → 7,37 GB** küçülür, uygulama katmanı 1,4 MB'a iner. Kalan boyut

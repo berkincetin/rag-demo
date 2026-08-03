@@ -23,13 +23,20 @@ CASES = [
 
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")
+    # A user name appends a sentence to the system prompt, and Task 12 measured
+    # that every extra sentence there can suppress the tool call. Passing one
+    # here is how that risk is re-measured after the personalisation change.
+    user_name = sys.argv[1] if len(sys.argv) > 1 else None
     agent = build_agent()
     failures = 0
+
+    if user_name:
+        print(f"Kullanıcı adı: {user_name}\n")
 
     for question, should_pass, needle in CASES:
         hits = agent.retriever.search(question, top_k=5)
         confident = agent.retriever.is_confident(hits)
-        answer = agent.answer(question)
+        answer = agent.answer(question, user_name=user_name)
 
         checks = [("kapı", confident == should_pass)]
         if should_pass:

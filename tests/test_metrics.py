@@ -14,6 +14,9 @@ def _run(**overrides) -> RunRecord:
         gate_passed=True,
         tool_calls=1,
         repaired=False,
+        peak_cpu_percent=None,
+        peak_ram_mb=None,
+        gpu_vram_mb=None,
     )
     base.update(overrides)
     return RunRecord(**base)
@@ -95,6 +98,59 @@ def test_gate_pass_rate_counts_refusals(tmp_path):
     store.record(_run(gate_passed=False))
 
     assert next(iter(store.summary_by_model())).gate_pass_rate == 0.5
+
+
+def test_resource_usage_is_stored(tmp_path):
+    store = MetricsStore(tmp_path / "m.db")
+    store.record(_run(peak_cpu_percent=87.5, peak_ram_mb=9000, gpu_vram_mb=0))
+
+    row = store.recent()[0]
+
+    assert row.peak_cpu_percent == 87.5
+    assert row.peak_ram_mb == 9000
+    assert row.gpu_vram_mb == 0  # loaded on CPU — a real measurement, not "unknown"
+
+
+def test_unmeasured_resources_stay_null(tmp_path):
+    store = MetricsStore(tmp_path / "m.db")
+    store.record(_run(peak_cpu_percent=None, peak_ram_mb=None, gpu_vram_mb=None))
+
+    row = store.recent()[0]
+
+    assert row.peak_cpu_percent is None
+    assert row.gpu_vram_mb is None
+
+
+def test_an_older_database_is_migrated_in_place(tmp_path):
+    # A database written before the resource columns existed must still open.
+    import sqlite3
+
+    path = tmp_path / "old.db"
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "CREATE TABLE runs (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL,"
+            " model_id TEXT NOT NULL, provider TEXT NOT NULL, question TEXT NOT NULL,"
+            " latency_ms INTEGER NOT NULL, input_tokens INTEGER, output_tokens INTEGER,"
+            " cost_usd REAL, citation_count INTEGER NOT NULL, gate_passed INTEGER NOT NULL,"
+            " tool_calls INTEGER NOT NULL, repaired INTEGER NOT NULL)"
+        )
+
+    store = MetricsStore(path)
+    store.record(_run())
+
+    assert "peak_cpu_percent" in store.columns()
+    assert store.recent()[0].peak_cpu_percent is None
+
+
+def test_summary_totals_input_and_output_tokens_separately(tmp_path):
+    store = MetricsStore(tmp_path / "m.db")
+    store.record(_run(input_tokens=1000, output_tokens=100))
+    store.record(_run(input_tokens=500, output_tokens=50))
+
+    row = next(iter(store.summary_by_model()))
+
+    assert row.total_input_tokens == 1500
+    assert row.total_output_tokens == 150
 
 
 def test_clear_removes_every_row(tmp_path):

@@ -3,15 +3,14 @@
 > Bu dosya her fazın sonunda güncellenir. Oturum başında **önce burayı**, sonra
 > [MEMORY.md](MEMORY.md) dosyasını oku. Çalışma kuralları: [CLAUDE.md](CLAUDE.md).
 
-**Son güncelleme:** 2026-08-02
-**Aktif bölüm:** Bölüm 1 — RAG Agent
-**Aktif bölüm:** Bölüm 1 tamamlandı (14/14). **Sağlayıcı Merkezi genişletmesi planlandı,
-onay bekliyor** — kod yazılmadı.
-**Okunacak dosya:** [tasarım](docs/superpowers/specs/2026-08-02-saglayici-merkezi-tasarim.md)
-+ [plan genel bakış](docs/superpowers/plans/saglayici-merkezi/00-overview.md)
-**Sıradaki somut adım:** Kullanıcı onayı → Task 1 (model kataloğu + fiyat tablosu)
+**Son güncelleme:** 2026-08-03
+**Aktif bölüm:** Bölüm 1 tamamlandı (14/14). **Sağlayıcı Merkezi genişletmesi
+tamamlandı (17/17)** — Task 14–17 (kaynak ölçümü, bellek, kimlik) dahil.
+**Okunacak dosya:** [plan genel bakış](docs/superpowers/plans/saglayici-merkezi/00-overview.md)
+**Sıradaki somut adım:** Bölüm 2 — Satış Analizi için superpowers task planı yazılması
 
 > ⚠️ **Bölüm 2 (Satış Analizi) hâlâ başlamadı.** Kullanıcı kararı: genişletme önce.
+> Genişletme bitti; sıradaki iş Bölüm 2.
 
 > ⚠️ **Eşik değerleri değişti:** `MIN_COSINE=0.72` **geçersiz**. Kalibre edilmiş değerler
 > `MIN_COSINE=0.80` + `MIN_BM25=5.0` (VE kapısı). Gerekçe ve ölçüm tablosu MEMORY.md Task 9.
@@ -28,8 +27,8 @@ onay bekliyor** — kod yazılmadı.
 |---|---|
 | Planlama (case analizi, veri keşfi, PRD/TRD/task planları) | ✅ Tamamlandı — 2026-08-01 |
 | Bölüm 1 — RAG Agent | ✅ Tamamlandı — 2026-08-02 (14/14 task) |
-| Sağlayıcı Merkezi genişletmesi | 📋 Planlandı (0/13 task) — **onay bekliyor**, kod yazılmadı |
-| Bölüm 2 — Satış Analizi | ⬜ Başlamadı (0/7 faz) — genişletmeden sonra |
+| Sağlayıcı Merkezi genişletmesi | ✅ Tamamlandı — 2026-08-03 (17/17 task) |
+| Bölüm 2 — Satış Analizi | ⬜ Başlamadı (0/7 faz) — sıradaki iş |
 
 Legend: ⬜ başlamadı · 🔄 devam ediyor · ✅ tamamlandı · ⚠️ engellendi
 
@@ -139,6 +138,35 @@ Kavramsal arka plan: [docs/bolum1-rag/UYGULAMA-PLANI.md](docs/bolum1-rag/UYGULAM
 
 ---
 
+## Sağlayıcı Merkezi genişletmesi
+
+Plan: [docs/superpowers/plans/saglayici-merkezi/](docs/superpowers/plans/saglayici-merkezi/) —
+13 task + kullanıcı isteğiyle eklenen Task 14–17.
+Tasarım: [spec](docs/superpowers/specs/2026-08-02-saglayici-merkezi-tasarim.md).
+
+| # | Task | Durum | Not |
+|---|---|---|---|
+| 1 | Model kataloğu ve fiyatlandırma | ✅ | 5 model; yalnız Anthropic fiyatları dolu, diğerleri `null` |
+| 2 | Oturum kapsamlı anahtar deposu | ✅ | Diske yazmama kaynak kodu testiyle korunuyor (ADR-012) |
+| 3 | Token muhasebesi + Gemini istemcisi | ✅ | 4 sağlayıcının token alanları ayrı ayrı eşlendi |
+| 4 | Metrik deposu (SQLite) | ✅ | Ölçülmeyen değer NULL; `priced_runs` ayrı raporlanıyor |
+| 5 | LangGraph agent migrasyonu 🎯 | ✅ | `tests/test_agent.py` **değişmedi** (SHA256 aynı), 8/8 yeşil |
+| 6 | Agent → metrik entegrasyonu | ✅ | Süre, token, maliyet, kapı, tur, onarım kaydediliyor |
+| 7 | Ollama model yöneticisi | ✅ | `/api/tags`, akışlı `/api/pull`, `/api/delete` |
+| 8 | Otomatik değerlendirme | ✅ | 13 vaka: atıf oranı, kaynak isabeti, ret doğruluğu |
+| 9 | Arayüz: sağlayıcı ve model seçimi | ✅ | `st.form` — `text_input` blur sorunu |
+| 10 | Arayüz: yerel model yönetimi | ✅ | İndirme ilerlemesi; toplam bilinmiyorsa yüzde uydurulmuyor |
+| 11 | Arayüz: metrik paneli + sohbet rozeti | ✅ | Fiyatı bilinmeyen model grafikten çıkarılıp sayısı yazılıyor |
+| 12 | Arayüz: değerlendirme karşılaştırması | ✅ | Atıf oranı → gecikme sıralaması |
+| 13 | Kurulum, Docker otomatik pull, dokümanlar | ⚠️ | `setup.py` Ollama'yı kurmaz, komutu yazar. Docker DoD 2026-08-03'te **kısmen** doğrulandı: `ollama-init` 4,7 GB'ı kendi çekti, UI HTTP 200. Doğrularken bulunan kusur: `ollama` host portunu yayımlıyordu → yerel Ollama varken stack başlamıyordu, `expose`'a çevrildi. **Açık kalan:** konteyner içi smoke test bitmeden Docker daemon çöktü (16 GB'ta iki Ollama aynı modeli yükledi) — tekrar denemek için önce host Ollama durdurulmalı |
+| 14 | Kaynak tüketimi ölçümü | ✅ | `resources.py`; `None` (ölçülemedi) ile `0` (CPU'da) ayrı |
+| 15 | Token'ları ayrı ayrı göster | ✅ | Giriş/çıkış ayrı sütun + tepe CPU/RAM/GPU sütunları |
+| 16 | Sohbet belleği 🎯 | ✅ | Kapı riski entegrasyon testiyle ölçüldü ve çözüldü |
+| 17 | Kullanıcı adı ve kişiselleştirme | ✅ | Ad boşken prompt birebir eski hali; ad veritabanına yazılmıyor. Ad **yalnız sistem promptundayken etkisizdi** — tool sonucu mesajına taşındı, sonra ölçüldü: "Merhaba Berkin, …" (atıf=2, tool=1) |
+| + | 🚨 Retrieval kararsızlığı (aralıklı test hatasından çıktı) | ✅ | HNSW `search_ef=10` varsayılanı doğru parçayı 8 koşunun 2'sinde ilk 20'ye hiç sokmuyordu → kapı altı kosinüs → geçerli soruya ret. `hnsw:search_ef=200`, indeks yeniden kuruldu, 10/10 doğru (ADR-016) |
+
+---
+
 ## Bölüm 2 — Satış Analizi
 
 **Plan durumu:** ⏳ Superpowers task planı **henüz yazılmadı.** Bölüm 1 (Task 14) bittikten
@@ -226,3 +254,9 @@ Her faz kapandığında buraya bir satır eklenir.
 | 2026-08-02 | 1 | Task 12 — Agent döngüsü | `feat(agent)` | 103 passed + 2 skipped, %95,05 cov | 3 kök neden: kısa prompt + `CITATION_REMINDER` tool sonucunda, tool çağrılmazsa **bağlam enjeksiyonu**, timeout 120s→600s. Uçtan uca doğrulandı |
 | 2026-08-02 | 1 | Task 13 — CLI + Streamlit | `feat(cli)` | 103 passed + 2 skipped, %95,05 cov | CLI: DOCX tablosundan `1.500 TL/ay` ✅. Streamlit tarayıcıda test edildi: konu dışı → Kaynaklar(0)/Araç(0); Vitatin95 → 1 kaynak + trace tablosu |
 | 2026-08-02 | 1 | Task 14 — Demo, Docker, README | `docs` | 103 passed + 2 skipped, %95,05 cov | Notebook 9 senaryo 0 hata (~25 dk); Docker `up` → HTTP 200; 3 komut sıfırdan doğrulandı. Duxet sorusu atıfsız kaldı (sınırlılık #8) |
+| 2026-08-02 | 1 | Docker uçtan uca test + sıcaklık düzeltmesi | `fix(llm)` + `docs` | smoke test 0 hata, 3 koşu birebir aynı | 🚨 Atıf kaybının kökü: `options.temperature` gönderilmiyordu (Ollama varsayılanı 0.8). `LLM_TEMPERATURE=0` + `CITATION_REPAIR`. `.dockerignore` ile imaj 8,98 → 7,37 GB |
+| 2026-08-02 | + | Sağlayıcı Merkezi Task 1–4 | `feat(providers)` | — | Katalog, fiyat tablosu, oturum anahtarları, token muhasebesi, SQLite metrik deposu |
+| 2026-08-02 | + | Sağlayıcı Merkezi Task 5–6 | `feat(agent)` | 8/8 agent testi değişmeden yeşil | LangGraph migrasyonu; `tests/test_agent.py` SHA256 aynı kaldı |
+| 2026-08-02 | + | Sağlayıcı Merkezi Task 7–12 | `feat(ui)` | — | 4 yeni Streamlit sayfası + Ollama yöneticisi + otomatik değerlendirme |
+| 2026-08-02 | + | Sağlayıcı Merkezi Task 13 | `feat(setup)` | — | `scripts/setup.py`, `ollama-init` servisi, ADR-011/012/013, README |
+| 2026-08-03 | + | Sağlayıcı Merkezi Task 14–17 | `feat(agent)` | 247 passed, %95,05 cov | Kaynak ölçümü (`resources.py`), giriş/çıkış token sütunları, oturum belleği (`memory.py`), kullanıcı adı. Yol boyunca 5 kusur bulundu ve düzeltildi: `st.text_input` her rerun'da yeniden cevaplatıyordu, `inject_context` çıplak soruyla arıyordu, compose host portu çakışıyordu, ad yalnız sistem promptunda etkisizdi, **HNSW `search_ef` geçerli soruya ret ürettiriyordu (ADR-016)** |

@@ -105,8 +105,24 @@ git commit -m "docs: add provider hub setup, Docker auto-pull, and ADR-011..013"
 ```
 
 ## Definition of Done
-- [ ] 4 test yeşil
-- [ ] `docker compose up` sonrası elle pull **olmadan** smoke test 0 hata
-- [ ] ADR-011/012/013 yazıldı, ADR-001 superseded işaretlendi
-- [ ] README dört yeni bölümü ve güvenlik notlarını içeriyor
-- [ ] Ollama otomatik **kurulmuyor**, yalnız komut gösteriliyor
+- [x] 4 test yeşil
+- [x] `docker compose up` sonrası elle pull **olmadan** model geliyor — 2026-08-03'te
+      doğrulandı: `ollama-init` konteyneri 4,7 GB'ı kendisi çekti (`ollama list` →
+      `qwen2.5:7b-instruct-q4_K_M`, "18 seconds ago"), `rag` servisi
+      `service_completed_successfully` ile bekledi.
+      ⚠️ Bu doğrulama sırasında bulunan kusur: `ollama` servisi **host portunu
+      yayımlıyordu** (`11434:11434`). Kurulum betiği kullanıcıya yerel Ollama kurmasını
+      söylediği için o port doluydu ve `docker compose up` **hiç başlamıyordu**.
+      `expose` ile değiştirildi
+- [ ] Konteyner içi smoke test `Başarısız kontrol sayısı: 0` — **doğrulanamadı.**
+      `docker compose exec -T rag python scripts/smoke_test.py` başladı (Chroma
+      koleksiyonu açıldı, telemetri satırları konteynerden geldi) ama koşu bitmeden
+      Docker daemon çöktü: `docker ps` dahil her çağrı
+      `500 Internal Server Error ... /exec/.../json` döndü. Neden kaynak tükenmesi:
+      16 GB'lık makinede host Ollama (WSL) ve konteyner Ollama **aynı 4,7 GB modeli
+      aynı anda** yüklüyordu; ölçüm anında boş RAM 1 GB'ın altındaydı. Uygulama hatası
+      değil, ortam sınırı. Tekrar denemek için: host Ollama'yı durdur, sonra
+      `docker compose up -d` + smoke test
+- [x] ADR-011/012/013 yazıldı, ADR-001 superseded işaretlendi (docs/02-karar-kaydi.md)
+- [x] README dört yeni bölümü ve güvenlik notlarını içeriyor
+- [x] Ollama otomatik **kurulmuyor**, yalnız komut gösteriliyor — `tests/test_setup.py`

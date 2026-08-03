@@ -46,13 +46,23 @@ class Agent:
         self.metrics = metrics
         self._graph = build_graph(retriever, toolbox, llm, max_tool_turns)
 
-    def answer(self, question: str) -> Answer:
+    def answer(self, question: str, memory=None, user_name: str | None = None) -> Answer:
         """Answer a question, or refuse when the knowledge base cannot support one."""
         from src.rag.graph import initial_state
+        from src.rag.resources import NullMonitor, ResourceMonitor
+
+        # Sampling costs a thread and one Ollama call; skip it when nothing
+        # will consume the numbers.
+        is_local = _provider_of(getattr(self.llm, "model", "")) == "ollama"
+        monitor = ResourceMonitor(read_gpu=is_local) if self.metrics is not None else NullMonitor()
 
         started = time.perf_counter()
-        state = self._graph.invoke(initial_state(question))
+        with monitor:
+            state = self._graph.invoke(initial_state(question, memory=memory, user_name=user_name))
         latency_ms = int((time.perf_counter() - started) * 1000)
+        self._last_resources = monitor
+        # Read before the turn is appended, so the first question is turn 0.
+        turn_index = len(memory) if memory is not None else 0
 
         answer = Answer(
             text=state["final_text"],
@@ -61,10 +71,14 @@ class Agent:
             usage=state["usage"],
             latency_ms=latency_ms,
         )
-        self._record(question, state, answer)
+        self._record(question, state, answer, turn_index)
+        if memory is not None and answer.citations:
+            # Only grounded answers enter the history; remembering a refusal
+            # would pollute the next question's retrieval query.
+            memory.add(question, answer.text)
         return answer
 
-    def _record(self, question: str, state: dict, answer: Answer) -> None:
+    def _record(self, question: str, state: dict, answer: Answer, turn_index: int = 0) -> None:
         if self.metrics is None:
             return
 
@@ -87,6 +101,10 @@ class Agent:
                 gate_passed=state["gate_passed"],
                 tool_calls=len(state["trace"]),
                 repaired=state["repaired"],
+                peak_cpu_percent=self._last_resources.peak_cpu_percent,
+                peak_ram_mb=self._last_resources.peak_ram_mb,
+                gpu_vram_mb=self._last_resources.gpu_vram_mb,
+                turn_index=turn_index,
             )
         )
 

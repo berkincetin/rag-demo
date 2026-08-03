@@ -8,6 +8,7 @@ openpyxl==3.1.5
 streamlit==1.41.1
 python-dotenv==1.0.1
 requests==2.32.3
+psutil==6.1.1
 
 # Agent grafiği (ADR-011)
 langgraph==0.2.60

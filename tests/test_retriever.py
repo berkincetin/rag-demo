@@ -132,3 +132,25 @@ def test_in_domain_question_is_confident(retriever):
     hits = retriever.search("Yıllık izin talebimi nasıl yaparım?", top_k=5)
 
     assert retriever.is_confident(hits)
+
+
+@pytest.mark.integration
+def test_a_bare_follow_up_question_would_be_refused(retriever):
+    # The risk memory introduces: on its own this text resembles no document,
+    # so the score gate treats it as off-topic.
+    hits = retriever.search("peki ya müdür seviyesinde?", top_k=5)
+
+    assert not retriever.is_confident(hits)
+
+
+@pytest.mark.integration
+def test_the_enriched_follow_up_finds_the_vehicle_procedure(retriever):
+    from src.rag.memory import ConversationMemory, retrieval_query
+
+    memory = ConversationMemory()
+    memory.add("Direktör seviyesindeki bir çalışanın aylık yakıt limiti nedir?", "1.500 TL/ay")
+
+    hits = retriever.search(retrieval_query("peki ya müdür seviyesinde?", memory), top_k=5)
+
+    assert retriever.is_confident(hits)
+    assert any("arac_kullanim" in hit.chunk.metadata["source_file"] for hit in hits)

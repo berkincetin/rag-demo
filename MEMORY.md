@@ -402,6 +402,49 @@ teorik olarak koşudan koşuya farklı karar alabilir.
 
 ---
 
+### Sağlayıcı Merkezi — Task 1–13 (2026-08-02)
+
+Plan: [docs/superpowers/plans/saglayici-merkezi/](docs/superpowers/plans/saglayici-merkezi/).
+Dört commit: `feat(providers)`, `feat(agent)` (LangGraph), `feat(ui)`, `feat(setup)`.
+
+| Konu | Öğrenilen |
+|---|---|
+| **LangGraph yalnız şemadaki anahtarları taşır** | `_response` state şemasında olmadığı için düğümler arasında **kayboldu** → `KeyError`. `TypedDict`'e `pending_tool_calls: list[Any]` eklendi. Kural: iki düğüm arasında taşınan her şey şemada tanımlı olmalı |
+| **Göç kanıtı: `tests/test_agent.py` değişmedi** | Kabul kriteri sözleşmeydi. `git diff --stat` boş, SHA256 aynı (`6D6EBE8A…FEE19`), 8/8 yeşil, gerçek modelde smoke test 0 hata |
+| **Streamlit `text_input` yalnız blur'da yazar** | Anahtar girip **Kaydet**'e tıklandığında boş değer kaydediliyordu (tıklama blur'dan önce rerun tetikliyor). `st.form` + `st.form_submit_button` ile atomik gönderim |
+| **Varsayılan model `bge-m3` seçiliyordu** | `ollama list` embedding modellerini de döndürüyor; alfabetik ilk isim sohbet edemiyor. `active_model(..., preferred=Config.load().llm_model)` eklendi |
+| **Fiyatı bilinmeyen model `$0` değil** | `config/model_prices.json`'da yalnız Anthropic fiyatları dolu (2026-06-24 tablosu). OpenAI/Gemini `null` → `estimate_cost` `None` → arayüz **"fiyat girilmedi"**. SQL tarafında `COUNT(cost_usd)` ile `priced_runs` raporlanıyor; NULL ortalamayı düşürmüyor |
+| **Anahtarlar diske yazılmıyor** | `SessionCredentialStore` yalnız bellekte; `__repr__` sadece sağlayıcı adlarını basar. Kaynak kodu testi `open(`, `Path(`, `json.dump`, `write_text` geçmesini engelliyor (ADR-012) |
+| **Boyut birimi `ollama list` ile aynı olmalı** | GiB/MiB ile ondalık GB/MB karıştırılınca iki test çelişti. **Ondalık** standart alındı (`12,6 MB`) |
+| **Etiket eşleştirme kuantizasyonu yok saymalı** | `qwen2.5:7b-instruct` ile `…-q4_K_M` aynı ağırlık. `_QUANT_SUFFIX = re.compile(r"-q\d+[_\w]*$")` |
+| **Ollama kurulumu otomatikleştirilmedi** | `scripts/setup.py` Ollama'yı **kurmaz**, platforma göre komutu yazar. Sessizce sistem kurulumu yapmak kullanıcı kararı olmalı. Docker tarafında `ollama-init` servisi modeli `service_completed_successfully` ile çeker |
+| 🚨 **`ollama` servisi host portunu yayımlıyordu** | `ports: ["11434:11434"]` — ama kurulum betiği kullanıcıya **yerel Ollama kurmasını** söylüyor ve o zaten 11434'ü tutuyor. Yani `docker compose up`, betiğin hazırladığı makinelerde **hiç başlamıyordu**. `expose` ile değiştirildi; `rag` zaten servis adıyla erişiyor. Doğrulama: yerel Ollama çalışırken `docker compose up -d` sorunsuz ayağa kalktı |
+| **Otomatik model çekme doğrulandı** | Sıfırdan `up`: `ollama-init` 4,7 GB'ı kendi çekti, `ollama list` modeli gösterdi, `rag` beklendi, `localhost:8501` → **HTTP 200**. Elle `ollama pull` **gerekmedi** |
+
+### Task 14–17 — Kaynak ölçümü, bellek, kimlik (2026-08-03)
+
+| Konu | Öğrenilen |
+|---|---|
+| 🚨 **`None` ile `0` farklı bilgidir** | GPU'da `size_vram == 0` = "ölçüldü, CPU'da çalışıyor"; `None` = "ölçülemedi". Arayüz ikisini ayrı gösteriyor. Aynı kural RAM/CPU ve fiyat için de geçerli |
+| **Kaynak ölçümü testleri 3,35 sn → 30 sn yaptı** | Her `answer()` çağrısı 5 sn timeout'lu bir Ollama `/api/ps` isteği yapıyordu. Üç katmanlı düzeltme: `metrics is None` iken `NullMonitor`, bulut modelinde `read_gpu=False`, timeout 2 sn |
+| 🎯 **Bellek, skor kapısını bozabilirdi** | *"peki ya müdür seviyesinde?"* tek başına hiçbir belgeye benzemiyor — kapı reddediyor (entegrasyon testiyle ölçüldü). Çözüm: **yalnız retrieval sorgusu** önceki soruyla genişletiliyor (`retrieval_query`), LLM'e giden mesajlarda kullanıcının **kendi yazdığı metin** duruyor |
+| **Reddedilen cevap belleğe girmiyor** | Girseydi bir sonraki sorunun retrieval sorgusunu konu dışı metinle kirletirdi |
+| **İsim satırı sistem promptunu bozmadı** | Task 12'de ölçülen risk (prompta eklenen her cümle tool çağrısını bastırabiliyor) yeniden ölçüldü. `smoke_test.py` isimsiz → **0 hata**; `smoke_test.py "Berkin"` → **0 hata**, üç alan içi soruda da `tool=1` ve atıf yerinde. Betiğe bu ölçümü tekrarlanabilir kılmak için isteğe bağlı isim argümanı eklendi. İsim boşken prompt **birebir** eski hali (test) |
+| 🎯 **İsim yalnız sistem promptunda etkisizdi** | Beklenen risk (tool çağrısının bastırılması) gerçekleşmedi, ama başka bir şey oldu: model ismi **hiç kullanmadı** (iki temellendirilmiş cevap, ikisinde de yok). Task 12'nin çözümü aynen işe yaradı — isim `CITATION_REMINDER` ile birlikte **tool sonucu mesajına** da eklenince ölçüm: *"Merhaba Berkin, …"* (atıf=2, tool=1), *"Berkin, direktör seviyesinde … 1.500 TL/ay"* (atıf=1, tool=1). **Kural: 7B modelde davranış talimatı sistem promptuna değil, tool sonucuna iliştirilir** |
+| **İsim ölçüm veritabanına yazılmıyor** | Kişisel veri. `path.read_bytes()` içinde adın geçmediğini doğrulayan test var |
+| **`turn_index` ölçüme eklendi** | Gecikme ve token sayısı geçmiş uzadıkça artıyor; tur numarası olmadan yavaş bir 3. tur "yavaş model" gibi görünür |
+| **`st.text_input` her rerun'da yeniden cevaplatıyordu** | Widget değerini koruduğu için kenar çubuğundaki her tıklama aynı soruyu tekrar cevaplatıyor ve belleğe **ikinci bir tur** ekliyordu. Belleksiz sürümde yalnız boşa giden bir çağrıydı, görünmüyordu. `st.chat_input` metni yalnız gönderimden sonraki koşuda bir kez döndürüyor |
+| **Ekran dökümü ≠ model belleği** | Reddedilen cevap belleğe girmiyor ama ekranda kalmalı → `ui_state.get_transcript` ayrı liste tutuyor |
+| 🚨 **Enjekte edilen arama da genişletilmeli** | `inject_context` (model tool çağırmayınca bizim onun yerine yaptığımız arama) **çıplak** soruyla arıyordu; kapı ise genişletilmiş sorguyla. Takip sorusunda yanlış belgelerden cevap üretirdi. Test kırmızıyı gösterdi: `assert 'yakıt limiti' in 'peki ya müdür?'`. İki arama yolu da artık `retrieval_query`'den geçiyor |
+| **Bellek uçtan uca doğrulandı** | Arayüzde: *"Direktör … yakıt limiti nedir?"* → `1.500 TL/ay`; ardından *"peki ya müdür seviyesinde?"* → `1.000 TL/ay`. İkisi de kaynak tablodaki değerlerle birebir, `gate_passed=1`, `turn_index=1` |
+| ⏱ **CPU'da sohbet çok yavaş** | Tarayıcı da çalışırken tek soru **422 sn**, geçmişli takip sorusu **306 sn**. `size_vram=0` — model GPU'ya hiç yüklenmiyor. Değerlendirici için README'deki yavaşlık uyarısı hâlâ geçerli, bellek onu uzatıyor (bağlam büyüyor) |
+| 🚨 **16 GB'ta iki Ollama aynı anda çalışmaz** | Konteyner içi smoke test doğrulaması sırasında host Ollama (WSL) ve konteyner Ollama **aynı 4,7 GB modeli** yükledi; boş RAM 1 GB'ın altına indi, **Docker daemon çöktü** (`docker ps` dahil her çağrı `500 Internal Server Error`) ve host tarafındaki ölçüm 600 sn timeout'a düştü. Uygulama hatası değil, ortam sınırı. Task 13'ün "konteyner smoke test 0 hata" satırı bu yüzden **doğrulanmadı** olarak bırakıldı; tekrar denemek için önce host Ollama durdurulmalı |
+| 🚨 **HNSW `search_ef` varsayılanı (10) sessizce cevap kaybettiriyordu** | Aralıklı test hatası kovalanınca çıktı ve **test sorunu değil, ürün hatası**: `test_document_code_is_matched_exactly` 12 tam koşunun 1'inde düşüyordu. Ölçüm — aynı indeks, **bayt bayt aynı** sorgu vektörü (`sha1=cc59028…`), BM25 her seferinde doğru: buna rağmen doğru parça **8 koşunun 2'sinde dense ilk 20'ye hiç girmedi**. Girdiğinde sırası 0 (gerçek en yakın komşu). Girmeyince en iyi kosinüs 0,7916'ya düşüyor → **0,80 kapısının altı** → ajan geçerli soruyu **reddediyor**. Sebep: HNSW yaklaşık arama, `search_ef=10` retriever'ın istediği `n_results=20`'den dar. Düzeltme: koleksiyon `hnsw:search_ef=200` ile yaratılıyor (276 parçada arama fiilen tam taramaya dönüyor). Doğrulama: kopya indekste 8/8, yeniden kurulan gerçek indekste **10/10, `gate=True`** |
+| ⚠️ **`collection.modify()` metadata'yı değiştirmez, değiştirir yerine geçer** | Kopya üstünde denerken `modify({'hnsw:search_ef': 200})` çağrısı `hnsw:space: cosine` anahtarını **sildi**; `space`'i birlikte yollamak da `ValueError: Changing the distance function … is not supported`. Bu yüzden ayar yükleme anında değil, **yaratma anında** veriliyor — yani ayar değişince `python scripts/ingest.py` ile indeks yeniden kurulmalı |
+| ⚠️ **Açıklanamayan tek test hatası (ayrı olay)** | Smoke test arka planda koşarken `--cov`'lu tam koşuda `test_chunks_jsonl_round_trips_text_and_citation` bir kez düştü. Hata metni yakalanamadı; **0/2 tekrar üretilebildi**. Yukarıdaki `search_ef` hatasıyla **aynı şey değil** — o test tmp_path'e yazıp okuyor, retrieval'a dokunmuyor. Tekrarlarsa `-rA --tb=long` ile bakılmalı |
+
+---
+
 ## 5. Açık Sorular / Bekleyen Kararlar
 
 _(Şu an yok. Bir karar kullanıcıya sorulacaksa buraya yaz, cevap gelince §1'e taşı.)_

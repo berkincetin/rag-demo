@@ -7,6 +7,12 @@ Bu doküman test edilen **her özelliği** üç başlıkta ele alır: *kullanıl
 *neden seçildiği*, *nasıl çalıştığı* — ve o özelliğin bu testte üretilen **ölçülmüş
 kanıtı**. Rapor sırasında bulunan üç kusur ve çözümleri de belgelenmiştir.
 
+> ℹ️ **Kapsam notu.** Rapor 2026-08-02 tarihli koda aittir; Sağlayıcı Merkezi
+> genişletmesinden (LangGraph, çok sayfalı arayüz, metrik deposu, sohbet belleği,
+> kaynak ölçümü) **öncesini** ölçer. Bu bölümlerin doğrulaması PROGRESSION.md'deki
+> Sağlayıcı Merkezi tablosunda ve testlerdedir. Aşağıdaki Docker ölçümleri
+> (imaj boyutu, konteynerde chunk sayısı, ağ) hâlâ geçerlidir.
+
 ---
 
 ## 0. Yönetici özeti

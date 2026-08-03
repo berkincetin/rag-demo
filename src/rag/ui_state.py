@@ -13,6 +13,47 @@ from src.rag.credentials import SessionCredentialStore, mask_key
 
 _STORE_KEY = "_credential_store"
 _ACTIVE_MODEL_KEY = "_active_model_id"
+_MEMORY_KEY = "_conversation_memory"
+_USER_NAME_KEY = "_user_name"
+_TRANSCRIPT_KEY = "_transcript"
+
+
+def get_memory(session: MutableMapping):
+    """The session's conversation memory, created on first use."""
+    from src.rag.memory import ConversationMemory
+
+    memory = session.get(_MEMORY_KEY)
+    if memory is None:
+        memory = ConversationMemory()
+        session[_MEMORY_KEY] = memory
+    return memory
+
+
+def set_user_name(session: MutableMapping, name: str) -> None:
+    session[_USER_NAME_KEY] = (name or "").strip()
+
+
+def get_user_name(session: MutableMapping) -> str:
+    return session.get(_USER_NAME_KEY, "")
+
+
+def get_transcript(session: MutableMapping) -> list[tuple[str, str]]:
+    """What is shown on screen — a superset of what the model remembers.
+
+    Refusals are deliberately kept out of `ConversationMemory` but still belong
+    in front of the user, so the screen keeps its own list.
+    """
+    return session.setdefault(_TRANSCRIPT_KEY, [])
+
+
+def add_to_transcript(session: MutableMapping, question: str, answer: str) -> None:
+    get_transcript(session).append((question, answer))
+
+
+def clear_chat(session: MutableMapping) -> None:
+    """Reset the conversation. The user's name survives — it is not a turn."""
+    get_memory(session).clear()
+    session[_TRANSCRIPT_KEY] = []
 
 
 @dataclass(frozen=True)
@@ -169,12 +210,39 @@ def summary_rows(summaries) -> list[dict]:
                 "sağlayıcı": summary.provider,
                 "koşu": summary.runs,
                 "ort. süre": format_latency(summary.avg_latency_ms),
+                "toplam giriş tk": _int_or_dash(summary.total_input_tokens),
+                "toplam çıkış tk": _int_or_dash(summary.total_output_tokens),
+                "tepe CPU": format_percent(summary.peak_cpu_percent),
+                "tepe RAM": format_ram(summary.peak_ram_mb),
                 "ort. atıf": _tr(summary.avg_citations, 1),
                 "kapı isabeti": format_rate(summary.gate_pass_rate),
                 "cost": cost,
             }
         )
     return rows
+
+
+def _int_or_dash(value: int | None) -> str:
+    return "—" if value is None else f"{value:,}".replace(",", ".")
+
+
+def format_percent(value: float | None) -> str:
+    return "—" if value is None else f"%{value:.0f}"
+
+
+def format_ram(mb: int | None) -> str:
+    if mb is None:
+        return "—"
+    return f"{_tr(mb / 1024, 1)} GB" if mb >= 1024 else f"{mb} MB"
+
+
+def format_gpu(vram_mb: int | None) -> str:
+    """`None` = ölçülemedi; `0` = model yüklü ama CPU'da çalışıyor."""
+    if vram_mb is None:
+        return "ölçülmedi"
+    if vram_mb == 0:
+        return "CPU'da (GPU kullanılmıyor)"
+    return f"{_tr(vram_mb / 1024, 1)} GB VRAM"
 
 
 def estimate_eval_cost(model_id: str, cases: int) -> float | None:

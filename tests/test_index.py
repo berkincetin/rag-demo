@@ -5,6 +5,7 @@ import pytest
 from src.rag.chunker import chunk_sections
 from src.rag.index import build_index, load_index
 from src.rag.models import RawSection
+from src.rag.retriever import _CANDIDATES
 
 
 def _tiny_corpus() -> list:
@@ -59,6 +60,20 @@ def test_rebuilding_is_idempotent(tmp_path):
     assert second.chunk_count == 2
     assert len(loaded.chunks) == 2
     assert loaded.collection.count() == 2
+
+
+@pytest.mark.integration
+def test_the_index_searches_wider_than_the_retriever_asks_for(tmp_path):
+    # Measured: with HNSW's default search_ef (10) against n_results=20, the true
+    # nearest neighbour of "OPS-PRO-003" fell out of the dense top-20 in 2 of 8
+    # runs on an identical index and a byte-identical query vector. Its cosine
+    # (0.8107) is the only one above the 0.80 gate, so the miss made the agent
+    # refuse a valid question. search_ef must exceed what the retriever requests.
+    build_index(_tiny_corpus(), tmp_path)
+
+    loaded = load_index(tmp_path)
+
+    assert loaded.collection.metadata["hnsw:search_ef"] > _CANDIDATES
 
 
 @pytest.mark.integration

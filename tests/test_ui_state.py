@@ -29,6 +29,10 @@ def _summary(**overrides) -> ModelSummary:
         total_cost_usd=0.01,
         avg_citations=1.0,
         gate_pass_rate=1.0,
+        total_input_tokens=100,
+        total_output_tokens=10,
+        peak_cpu_percent=None,
+        peak_ram_mb=None,
     )
     base.update(overrides)
     return ModelSummary(**base)
@@ -210,6 +214,91 @@ def test_summary_rows_mark_incomplete_pricing():
 
 
 # --- evaluation page helpers -----------------------------------------------
+
+
+def test_gpu_distinguishes_unmeasured_from_cpu_bound():
+    # The single most important distinction on this page: "we could not measure"
+    # and "measured, and it is not using the GPU" are different facts.
+    from src.rag.ui_state import format_gpu
+
+    assert format_gpu(None) == "ölçülmedi"
+    assert "CPU" in format_gpu(0)
+    assert "GB VRAM" in format_gpu(4096)
+
+
+def test_ram_switches_to_gigabytes():
+    from src.rag.ui_state import format_ram
+
+    assert format_ram(512) == "512 MB"
+    assert format_ram(9216) == "9,0 GB"
+    assert format_ram(None) == "—"
+
+
+def test_summary_rows_show_input_and_output_tokens_separately():
+    rows = summary_rows([_summary(total_input_tokens=1500, total_output_tokens=150)])
+
+    assert rows[0]["toplam giriş tk"] == "1.500"
+    assert rows[0]["toplam çıkış tk"] == "150"
+
+
+def test_unmeasured_token_totals_show_a_dash():
+    rows = summary_rows([_summary(total_input_tokens=None, total_output_tokens=None)])
+
+    assert rows[0]["toplam giriş tk"] == "—"
+
+
+def test_the_session_remembers_a_user_name():
+    from src.rag.ui_state import get_user_name, set_user_name
+
+    session: dict = {}
+    set_user_name(session, "  Berkin  ")
+
+    assert get_user_name(session) == "Berkin"
+
+
+def test_conversation_memory_is_created_once_per_session():
+    from src.rag.ui_state import get_memory
+
+    session: dict = {}
+
+    assert get_memory(session) is get_memory(session)
+
+
+def test_the_screen_transcript_keeps_what_the_model_memory_drops():
+    # A refusal must not enter the model's memory — it would pollute the next
+    # retrieval query — but the user should still see it on screen.
+    from src.rag.ui_state import add_to_transcript, get_memory, get_transcript
+
+    session: dict = {}
+    add_to_transcript(session, "Bugün hava nasıl?", "Bu soru kapsamım dışında.")
+
+    assert [question for question, _ in get_transcript(session)] == ["Bugün hava nasıl?"]
+    assert len(get_memory(session)) == 0
+
+
+def test_clearing_the_chat_empties_the_transcript_and_the_memory():
+    from src.rag.ui_state import add_to_transcript, clear_chat, get_memory, get_transcript
+
+    session: dict = {}
+    get_memory(session).add("soru", "cevap")
+    add_to_transcript(session, "soru", "cevap")
+
+    clear_chat(session)
+
+    assert get_transcript(session) == []
+    assert len(get_memory(session)) == 0
+
+
+def test_clearing_the_chat_keeps_the_user_name():
+    # The name is an identity, not part of the conversation.
+    from src.rag.ui_state import clear_chat, get_user_name, set_user_name
+
+    session: dict = {}
+    set_user_name(session, "Berkin")
+
+    clear_chat(session)
+
+    assert get_user_name(session) == "Berkin"
 
 
 def test_cost_estimate_scales_with_the_case_count():

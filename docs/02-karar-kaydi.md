@@ -294,3 +294,78 @@ tablosu). OpenAI ve Gemini `null`'dur. Toplamlarda `priced_runs` ayrıca raporla
 
 **Alternatif.** Fiyatları API'den çekmek. Reddedildi: ağ bağımlılığı + kırılganlık, ve
 sağlayıcıların hepsi programatik fiyat uçları sunmuyor.
+
+---
+
+## ADR-014 — Sohbet belleği: yalnız arama sorgusu genişletilir ✅
+
+**Tarih:** 2026-08-03 · **Durum:** Kabul
+
+**Bağlam.** Oturum içi bellek eklenince kullanıcı *"peki ya müdür seviyesinde?"* gibi
+takip soruları soruyor. Bu metin tek başına hiçbir belgeye benzemiyor; ADR-008'in
+1. katmanı (skor kapısı) onu **konu dışı sayıp reddediyor**. Yani belleği naif eklemek
+hâlihazırda doğru çalışan bir davranışı bozuyor — entegrasyon testiyle ölçüldü.
+
+**Karar.** Bellek iki yere **farklı biçimde** bağlanır:
+1. **Retrieval sorgusu** son soruyla genişletilir: `f"{önceki_soru} {yeni_soru}"`
+   (`memory.retrieval_query`). Kapı böylece doğru belgeleri görür.
+2. **LLM'e giden mesajlar** tam geçmişi taşır ve son mesaj kullanıcının **kendi yazdığı
+   cümledir** — modelin gördüğü metin değiştirilmez.
+
+Bellek oturum içidir, diske yazılmaz (ADR-012 ile aynı gerekçe), son **5 tur** tutulur.
+**Atıfsız cevaplar belleğe girmez** — bir reddi hatırlamak sonraki aramayı kirletirdi.
+
+**Sonuç.** `test_a_bare_follow_up_question_would_be_refused` çıplak takip sorusunun
+reddedildiğini, `test_the_enriched_follow_up_finds_the_vehicle_procedure` genişletilmiş
+sorgunun doğru belgeyi bulduğunu gerçek indeks üzerinde kanıtlıyor.
+
+**Alternatif.** Tüm geçmişi tek sorguya katmak. Reddedildi: eski konu güncel soruyu
+bastırıyor (`test_only_the_last_turn_enriches_the_query`). Kapıyı bellek varken tamamen
+kapatmak da reddedildi — konu dışı reddi case'in zorunlu gereksinimi.
+
+---
+
+## ADR-015 — Ölçülemeyen kaynak `None`, sıfır değil ✅
+
+**Tarih:** 2026-08-03 · **Durum:** Kabul
+
+**Bağlam.** Yerel modelin CPU/RAM/GPU tüketimi ölçülüyor. GPU her makinede yok; `nvidia-smi`
+bulunmayabilir; bulut modelinde kaynak tüketimi zaten **bizim** makinemizde oluşmuyor.
+
+**Karar.** Ölçülemeyen her değer `None` olarak saklanır ve arayüzde `—` / "ölçülmedi"
+yazılır. `0` yalnız **ölçülmüş sıfır** anlamına gelir: Ollama `/api/ps` ucunda
+`size_vram == 0` ⇒ "model GPU'da değil, CPU'da çalışıyor" — bu bir bilgidir, eksiklik
+değil. GPU sinyali olarak `nvidia-smi` yerine `/api/ps` seçildi: modelin gerçekten
+GPU'ya yüklenip yüklenmediğini doğrudan söyler.
+
+**Sonuç.** SQL toplamları NULL'ları atladığı için ölçülmemiş koşu ortalamayı düşürmez.
+Aynı kural ADR-013'teki fiyat için de geçerlidir — proje genelinde tek kural.
+
+**Alternatif.** Ölçülemeyeni `0` yazmak. Reddedildi: "GPU yok" ile "GPU var, kullanılmıyor"
+aynı satıra düşerdi ve ortalamalar sessizce yanlış olurdu.
+
+---
+
+## ADR-016 — HNSW arama genişliği (`search_ef`) elle 200'e sabitlendi ✅
+
+**Tarih:** 2026-08-03 · **Durum:** Kabul
+
+**Bağlam.** Aralıklı bir test hatası kovalanırken ölçüldü: Chroma'nın HNSW varsayılan
+`search_ef` değeri **10**, retriever'ın istediği `n_results=20`'den dar. Sonuç, aynı
+indeks ve **bayt bayt aynı** sorgu vektörüyle bile kararsız: `OPS-PRO-003` sorgusunun
+gerçek en yakın komşusu 8 koşunun 2'sinde dense ilk 20'ye **hiç girmedi**. Girdiğinde
+sırası 0. Girmediğinde en iyi kosinüs 0,8107 yerine 0,7916 oluyor — yani **0,80
+kapısının altına** düşüyor ve ajan geçerli bir soruyu reddediyor. Yaklaşık aramanın
+kaçırması sessiz: ne hata, ne uyarı, sadece "bilmiyorum".
+
+**Karar.** Koleksiyon `metadata={"hnsw:space": "cosine", "hnsw:search_ef": 200}` ile
+yaratılır. 276 parçalık külliyatta bu, aramayı fiilen tam taramaya çevirir.
+
+**Sonuç.** Kopya indekste 8/8, yeniden kurulan gerçek indekste 10/10 doğru sonuç ve her
+seferinde `gate=True`. Değer yaratma anında verildiği için **ayar değişirse indeks
+yeniden kurulmalı** (`python scripts/ingest.py`) — `collection.modify()` metadata'yı
+birleştirmiyor, yerine geçiyor ve `hnsw:space` anahtarını siliyor.
+
+**Alternatif.** Kapı eşiğini düşürmek. Reddedildi: eşik ölçümle kalibre edildi
+(ADR-009), asıl sorun kapı değil, doğru parçanın hiç gelmemesiydi — eşiği düşürmek
+konu dışı soruları da içeri alırdı.

@@ -26,6 +26,11 @@ CITATION_REMINDER = (
 # Cevapta hiç [n] işareti çıkmadığında bir kez daha sorulur. Örnekleme
 # belirlenimsizliği yüzünden bu aralıklı olarak yaşanıyor; atıfsız cevap
 # elenmek zorunda olduğu için tek bir onarım turu doğru cevabı kurtarıyor.
+# Appended to the system prompt only when the user gave a name. Deliberately one
+# sentence: the prompt is fragile (see Task 12) and every added line risks the
+# tool call.
+USER_NAME_LINE = "Kullanıcının adı: {name}. Uygun olduğunda ona adıyla hitap et."
+
 CITATION_REPAIR = (
     "Cevabında kaynak numarası yok. Aynı cevabı yeniden yaz ve kullandığın "
     "her bilginin sonuna ilgili kaynağın numarasını [1], [2] biçiminde ekle. "

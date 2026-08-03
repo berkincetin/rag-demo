@@ -17,6 +17,14 @@ from src.rag.normalize import bm25_tokens
 COLLECTION_NAME = "documents"
 _BATCH_SIZE = 64
 _EMBEDDING_MODEL_DEFAULT = "intfloat/multilingual-e5-base"
+# HNSW is approximate, and its default search_ef of 10 is narrower than the 20
+# candidates the retriever asks for. Measured on this corpus: the true nearest
+# neighbour of "OPS-PRO-003" dropped out of the dense top-20 in 2 of 8 runs over
+# an identical index and a byte-identical query vector, which pushed the best
+# cosine under the 0.80 gate and made the agent refuse a valid question. At 276
+# chunks this value makes the search effectively exhaustive; recall over the
+# same 8 runs went to 8/8.
+_SEARCH_EF = 200
 
 
 @dataclass
@@ -56,7 +64,10 @@ def build_index(
         client.delete_collection(COLLECTION_NAME)
     except Exception:  # noqa: BLE001 - collection simply does not exist yet
         pass
-    collection = client.create_collection(COLLECTION_NAME, metadata={"hnsw:space": "cosine"})
+    collection = client.create_collection(
+        COLLECTION_NAME,
+        metadata={"hnsw:space": "cosine", "hnsw:search_ef": _SEARCH_EF},
+    )
 
     model = _encoder(embedding_model)
     for start in range(0, len(chunks), _BATCH_SIZE):

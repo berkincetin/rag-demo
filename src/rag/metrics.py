@@ -26,9 +26,22 @@ CREATE TABLE IF NOT EXISTS runs (
     citation_count INTEGER NOT NULL,
     gate_passed INTEGER NOT NULL,
     tool_calls INTEGER NOT NULL,
-    repaired INTEGER NOT NULL
+    repaired INTEGER NOT NULL,
+    peak_cpu_percent REAL,
+    peak_ram_mb INTEGER,
+    gpu_vram_mb INTEGER,
+    turn_index INTEGER NOT NULL DEFAULT 0
 )
 """
+
+# Columns added after the first release. Existing databases are migrated in
+# place rather than discarded — a user's measurement history is worth keeping.
+_LATER_COLUMNS = {
+    "peak_cpu_percent": "REAL",
+    "peak_ram_mb": "INTEGER",
+    "gpu_vram_mb": "INTEGER",
+    "turn_index": "INTEGER NOT NULL DEFAULT 0",
+}
 
 
 @dataclass
@@ -44,6 +57,10 @@ class RunRecord:
     gate_passed: bool
     tool_calls: int
     repaired: bool
+    peak_cpu_percent: float | None = None
+    peak_ram_mb: int | None = None
+    gpu_vram_mb: int | None = None
+    turn_index: int = 0
     ts: str | None = None
 
 
@@ -57,6 +74,10 @@ class ModelSummary:
     total_cost_usd: float | None
     avg_citations: float
     gate_pass_rate: float
+    total_input_tokens: int | None = None
+    total_output_tokens: int | None = None
+    peak_cpu_percent: float | None = None
+    peak_ram_mb: int | None = None
 
 
 class MetricsStore:
@@ -67,6 +88,10 @@ class MetricsStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.execute(_SCHEMA)
+            existing = {row["name"] for row in conn.execute("PRAGMA table_info(runs)")}
+            for column, sql_type in _LATER_COLUMNS.items():
+                if column not in existing:
+                    conn.execute(f"ALTER TABLE runs ADD COLUMN {column} {sql_type}")
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.path)
@@ -79,8 +104,10 @@ class MetricsStore:
                 """
                 INSERT INTO runs (ts, model_id, provider, question, latency_ms,
                                   input_tokens, output_tokens, cost_usd,
-                                  citation_count, gate_passed, tool_calls, repaired)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                  citation_count, gate_passed, tool_calls, repaired,
+                                  peak_cpu_percent, peak_ram_mb, gpu_vram_mb,
+                                  turn_index)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run.ts or datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -95,6 +122,10 @@ class MetricsStore:
                     int(run.gate_passed),
                     run.tool_calls,
                     int(run.repaired),
+                    run.peak_cpu_percent,
+                    run.peak_ram_mb,
+                    run.gpu_vram_mb,
+                    run.turn_index,
                 ),
             )
 
@@ -114,6 +145,10 @@ class MetricsStore:
                 gate_passed=bool(row["gate_passed"]),
                 tool_calls=row["tool_calls"],
                 repaired=bool(row["repaired"]),
+                peak_cpu_percent=row["peak_cpu_percent"],
+                peak_ram_mb=row["peak_ram_mb"],
+                gpu_vram_mb=row["gpu_vram_mb"],
+                turn_index=row["turn_index"],
                 ts=row["ts"],
             )
             for row in rows
@@ -129,7 +164,11 @@ class MetricsStore:
                        AVG(latency_ms)       AS avg_latency_ms,
                        SUM(cost_usd)         AS total_cost_usd,
                        AVG(citation_count)   AS avg_citations,
-                       AVG(gate_passed)      AS gate_pass_rate
+                       AVG(gate_passed)      AS gate_pass_rate,
+                       SUM(input_tokens)     AS total_input_tokens,
+                       SUM(output_tokens)    AS total_output_tokens,
+                       MAX(peak_cpu_percent) AS peak_cpu_percent,
+                       MAX(peak_ram_mb)      AS peak_ram_mb
                 FROM runs
                 GROUP BY model_id, provider
                 ORDER BY runs DESC
@@ -145,6 +184,10 @@ class MetricsStore:
                 total_cost_usd=row["total_cost_usd"],
                 avg_citations=row["avg_citations"],
                 gate_pass_rate=row["gate_pass_rate"],
+                total_input_tokens=row["total_input_tokens"],
+                total_output_tokens=row["total_output_tokens"],
+                peak_cpu_percent=row["peak_cpu_percent"],
+                peak_ram_mb=row["peak_ram_mb"],
             )
             for row in rows
         ]

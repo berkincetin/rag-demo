@@ -30,6 +30,7 @@ from src.rag.prompts import (
     NO_INFO_TEMPLATE,
     REFUSAL_TEMPLATE,
     SYSTEM_PROMPT,
+    USER_NAME_LINE,
 )
 from src.rag.tools import TOOL_SCHEMAS
 
@@ -48,12 +49,30 @@ class AgentState(TypedDict, total=False):
     # Tool calls the last llm_turn asked for. Declared in the schema because
     # LangGraph only carries keys the state type knows about.
     pending_tool_calls: list[Any]
+    # Session conversation history, or None for a stateless single question.
+    memory: Any
+    user_name: str | None
 
 
-def initial_state(question: str) -> AgentState:
-    """A fresh state for one question."""
+def _system_prompt(state: "AgentState") -> str:
+    """The grounded prompt, plus one line naming the user when one is known.
+
+    Kept to a single appended sentence on purpose: Task 12 measured that every
+    extra instruction in this prompt can stop qwen2.5-7b calling its tools at
+    all. With no name, the prompt is byte-identical to the tested one.
+    """
+    name = (state.get("user_name") or "").strip()
+    if not name:
+        return SYSTEM_PROMPT
+    return f"{SYSTEM_PROMPT}\n\n{USER_NAME_LINE.format(name=name)}"
+
+
+def initial_state(question: str, memory=None, user_name: str | None = None) -> AgentState:
+    """A fresh state for one question, optionally carrying history and identity."""
     return AgentState(
         question=question,
+        memory=memory,
+        user_name=user_name,
         messages=[],
         tool_outputs=[],
         trace=[],
@@ -72,12 +91,20 @@ def build_graph(retriever, toolbox, llm, max_tool_turns: int = 3):
     from src.rag.agent import extract_citations
 
     def score_gate(state: AgentState) -> AgentState:
-        hits = retriever.search(state["question"], top_k=5)
+        from src.rag.memory import retrieval_query
+
+        memory = state.get("memory")
+        # Search with the widened query so a follow-up question still reaches
+        # its documents; the model still sees exactly what the user typed.
+        hits = retriever.search(retrieval_query(state["question"], memory), top_k=5)
         passed = retriever.is_confident(hits)
+
+        history = memory.as_messages() if memory is not None else []
         return {
             "gate_passed": passed,
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": _system_prompt(state)},
+                *history,
                 {"role": "user", "content": state["question"]},
             ],
         }
@@ -98,6 +125,13 @@ def build_graph(retriever, toolbox, llm, max_tool_turns: int = 3):
 
     def _add_tool_result(state: AgentState, name, arguments, injected: bool) -> AgentState:
         output = toolbox.run(name, arguments)
+        # The name rides here as well as in the system prompt. Measured: with it
+        # only in the system prompt, qwen2.5-7b never used it — the same failure
+        # Task 12 saw with the citation rule, and the same fix.
+        reminder = CITATION_REMINDER
+        user_name = (state.get("user_name") or "").strip()
+        if user_name:
+            reminder = f"{reminder} {USER_NAME_LINE.format(name=user_name)}"
         return {
             "tool_outputs": [*state["tool_outputs"], output],
             "trace": [
@@ -112,7 +146,7 @@ def build_graph(retriever, toolbox, llm, max_tool_turns: int = 3):
             "messages": [
                 *state["messages"],
                 {"role": "assistant", "content": f"[tool: {name}]"},
-                {"role": "user", "content": f"{output}\n\n{CITATION_REMINDER}"},
+                {"role": "user", "content": f"{output}\n\n{reminder}"},
             ],
         }
 
@@ -127,10 +161,12 @@ def build_graph(retriever, toolbox, llm, max_tool_turns: int = 3):
     def inject_context(state: AgentState) -> AgentState:
         # The model answered without consulting the documents. Small local models
         # skip the tool call unpredictably, so retrieve on its behalf rather than
-        # losing the answer to the citation gate.
-        return _add_tool_result(
-            state, "search_documents", {"query": state["question"]}, injected=True
-        )
+        # losing the answer to the citation gate. Widened like the gate's search:
+        # a follow-up question alone would pull the wrong documents.
+        from src.rag.memory import retrieval_query
+
+        query = retrieval_query(state["question"], state.get("memory"))
+        return _add_tool_result(state, "search_documents", {"query": query}, injected=True)
 
     def citation_check(state: AgentState) -> AgentState:
         return {"citations": extract_citations(state["final_text"], state["tool_outputs"])}

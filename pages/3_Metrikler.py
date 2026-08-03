@@ -5,7 +5,14 @@ import streamlit as st
 
 from src.rag.config import Config
 from src.rag.metrics import MetricsStore
-from src.rag.ui_state import format_cost, format_latency, summary_rows
+from src.rag.ui_state import (
+    format_cost,
+    format_gpu,
+    format_latency,
+    format_percent,
+    format_ram,
+    summary_rows,
+)
 
 st.set_page_config(page_title="Metrikler", page_icon="📊")
 st.title("📊 Metrikler")
@@ -54,12 +61,13 @@ st.dataframe(
                 "zaman": run.ts,
                 "model": run.model_id,
                 "soru": run.question[:60],
+                "tur": run.turn_index,
                 "süre": format_latency(run.latency_ms),
-                "token": (
-                    f"{run.input_tokens}→{run.output_tokens}"
-                    if run.input_tokens is not None
-                    else "ölçülmedi"
-                ),
+                "giriş tk": "—" if run.input_tokens is None else run.input_tokens,
+                "çıkış tk": "—" if run.output_tokens is None else run.output_tokens,
+                "tepe CPU": format_percent(run.peak_cpu_percent),
+                "tepe RAM": format_ram(run.peak_ram_mb),
+                "GPU": format_gpu(run.gpu_vram_mb),
                 "maliyet": format_cost(run.cost_usd),
                 "atıf": run.citation_count,
                 "kapı": "✓" if run.gate_passed else "✗",

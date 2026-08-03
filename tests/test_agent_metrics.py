@@ -102,6 +102,54 @@ def test_an_unpriced_model_records_a_null_cost(tmp_path):
     assert store.recent()[0].cost_usd is None
 
 
+def test_the_user_name_never_reaches_the_database(tmp_path):
+    # The name is personal data and exists only to personalise the reply; the
+    # measurement file is exported and shared, so it must not carry it.
+    path = tmp_path / "m.db"
+    store = MetricsStore(path)
+    llm = _NamedLLM(
+        [
+            LLMResponse(tool_calls=[ToolCall("1", "search_documents", {"query": "x"})]),
+            LLMResponse(text="Cevap [1]."),
+        ]
+    )
+    agent = Agent(_StubRetriever(confident=True), _StubToolBox(), llm, metrics=store)
+
+    agent.answer("s", user_name="Zebedeyus")
+
+    assert b"Zebedeyus" not in path.read_bytes()
+
+
+def test_the_turn_number_is_recorded(tmp_path):
+    # Latency and token counts grow with history length; without the turn
+    # number a slow third turn looks like a slow model.
+    from src.rag.memory import ConversationMemory
+
+    store = MetricsStore(tmp_path / "m.db")
+    memory = ConversationMemory()
+    memory.add("önceki", "cevap")
+    llm = _NamedLLM(
+        [
+            LLMResponse(tool_calls=[ToolCall("1", "search_documents", {"query": "x"})]),
+            LLMResponse(text="Cevap [1]."),
+        ]
+    )
+    agent = Agent(_StubRetriever(confident=True), _StubToolBox(), llm, metrics=store)
+
+    agent.answer("s", memory=memory)
+
+    assert store.recent()[0].turn_index == 1
+
+
+def test_without_memory_the_turn_number_is_zero(tmp_path):
+    store = MetricsStore(tmp_path / "m.db")
+    agent = Agent(_StubRetriever(confident=False), _StubToolBox(), _NamedLLM([]), metrics=store)
+
+    agent.answer("Bugün hava nasıl?")
+
+    assert store.recent()[0].turn_index == 0
+
+
 def test_metrics_are_optional():
     # metrics=None must keep the agent working exactly as before.
     agent = Agent(_StubRetriever(confident=False), _StubToolBox(), _NamedLLM([]))

@@ -1,0 +1,16 @@
+# Bölüm 2 — Satış ve talep analizi bağımlılıkları.
+# Sürümler kurulu ortamdan (`pip freeze`) birebir alındı, tahmin edilmedi.
+# Bölüm 1'i çalıştırmak için ayrıca `requirements.txt` gerekir.
+
+pandas==2.2.3
+numpy==2.2.6
+openpyxl==3.1.5
+matplotlib==3.10.9
+statsmodels==0.14.6
+scipy==1.15.3
+scikit-learn==1.7.2
+lightgbm==4.7.0
+jupyter==1.1.1
+
+# plotly bilerek yok: PRD §3.3 etkileşimli dashboard'u kapsam dışı bırakıyor ve
+# teslimde figürler statik PNG olarak isteniyor.

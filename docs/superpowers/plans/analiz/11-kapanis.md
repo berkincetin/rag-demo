@@ -48,8 +48,25 @@ sessizce atlanmaz.
 - [ ] **Adım 8: Kalite kapısı ve commit** — `docs: close part 2 with executive summary and README`
 
 ## Definition of Done
-- [ ] `Restart & Run All` hatasız — komut çıktısıyla kanıtlanmış
-- [ ] PRD §4'ün 11 maddesi tek tek işaretlenmiş
-- [ ] Figürler `figures/` altında PNG
-- [ ] README Bölüm 2 adımlarını ve sınırlılıkları içeriyor
-- [ ] PROGRESSION.md Bölüm 2'yi kapanmış gösteriyor
+- [x] `Restart & Run All` hatasız — `jupyter nbconvert --execute` temiz `figures/`
+      dizininden koştu, 52 hücre, **hatalı hücre: []**
+- [x] PRD §4'ün 11 maddesi tek tek doğrulandı (aşağıdaki tablo)
+- [x] Figürler `figures/` altında PNG — 10 dosya
+- [x] README Bölüm 2 adımlarını, MF ölçek gerekçesini ve 5 sınırlılığı içeriyor
+- [x] PROGRESSION.md Bölüm 2'yi kapanmış gösteriyor (11/11)
+
+### PRD §4 kabul kriterleri — doğrulama
+
+| # | Kriter | Sonuç |
+|---|---|---|
+| 1 | Notebook `Restart & Run All` ile hatasız | ✅ hatalı hücre yok |
+| 2 | 7 sorunun her biri için ≥1 grafik | ✅ toplam 10 grafik |
+| 3 | 7 sorunun her biri için teknik **ve** iş yorumu | ✅ 7 + 7 |
+| 4 | A7'de ≥2 yaklaşım ve pazar bazında MAE/MAPE/RMSE | ✅ 5 model, pazar bazında tablo |
+| 5 | A7'de MF katkısı **ablasyonla** ölçülmüş | ✅ `lgbm` vs `lgbm_no_mf` |
+| 6 | A4'te p-değeri ve etki büyüklüğü içeren tablo | ✅ Mann-Whitney + Welch + Cliff δ + BH-FDR |
+| 7 | MF ölçek düzeltmesi uygulanmış ve gerekçesi gösterilmiş | ✅ düzeltmeli/düzeltmesiz fiyat tablosu |
+| 8 | Veri kalitesi raporu notebook başında | ✅ 7 satırlık tablo |
+| 9 | Kısa seriler gizlenmemiş, açıkça raporlanmış | ✅ iki ayrı tabloda "yetersiz geçmiş" |
+| 10 | Grafiklerde Türkçe eksen etiketi ve başlık | ✅ `plots.stil_uygula` + `tr_sayi` |
+| 11 | `pip install -r requirements-analysis.txt` ile kuruluyor | ✅ 9 paket, sürümler `pip freeze`'den |

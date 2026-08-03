@@ -3,14 +3,13 @@
 > Bu dosya her fazın sonunda güncellenir. Oturum başında **önce burayı**, sonra
 > [MEMORY.md](MEMORY.md) dosyasını oku. Çalışma kuralları: [CLAUDE.md](CLAUDE.md).
 
-**Son güncelleme:** 2026-08-03
-**Aktif bölüm:** Bölüm 1 tamamlandı (14/14). **Sağlayıcı Merkezi genişletmesi
-tamamlandı (17/17)** — Task 14–17 (kaynak ölçümü, bellek, kimlik) dahil.
-**Okunacak dosya:** [plan genel bakış](docs/superpowers/plans/saglayici-merkezi/00-overview.md)
-**Sıradaki somut adım:** Bölüm 2 — Satış Analizi için superpowers task planı yazılması
+**Son güncelleme:** 2026-08-04
+**Aktif bölüm:** Her iki bölüm de tamamlandı. Bölüm 1 (14/14) + Sağlayıcı Merkezi
+genişletmesi (17/17) + Bölüm 2 (11/11).
+**Okunacak dosya:** [Bölüm 2 plan genel bakışı](docs/superpowers/plans/analiz/00-overview.md)
+**Sıradaki somut adım:** Teslim paketi — ZIP'e `data/` ve `AI Engineer/bolum2_veriseti.xlsx` elle eklenmeli
 
-> ⚠️ **Bölüm 2 (Satış Analizi) hâlâ başlamadı.** Kullanıcı kararı: genişletme önce.
-> Genişletme bitti; sıradaki iş Bölüm 2.
+> ✅ **Bölüm 2 tamamlandı** (2026-08-04). Kalan tek iş teslim paketinin hazırlanması.
 
 > ⚠️ **Eşik değerleri değişti:** `MIN_COSINE=0.72` **geçersiz**. Kalibre edilmiş değerler
 > `MIN_COSINE=0.80` + `MIN_BM25=5.0` (VE kapısı). Gerekçe ve ölçüm tablosu MEMORY.md Task 9.
@@ -28,7 +27,7 @@ tamamlandı (17/17)** — Task 14–17 (kaynak ölçümü, bellek, kimlik) dahil
 | Planlama (case analizi, veri keşfi, PRD/TRD/task planları) | ✅ Tamamlandı — 2026-08-01 |
 | Bölüm 1 — RAG Agent | ✅ Tamamlandı — 2026-08-02 (14/14 task) |
 | Sağlayıcı Merkezi genişletmesi | ✅ Tamamlandı — 2026-08-03 (17/17 task) |
-| Bölüm 2 — Satış Analizi | ⬜ Başlamadı (0/7 faz) — sıradaki iş |
+| Bölüm 2 — Satış Analizi | ✅ Tamamlandı — 2026-08-04 (11/11 task) |
 
 Legend: ⬜ başlamadı · 🔄 devam ediyor · ✅ tamamlandı · ⚠️ engellendi
 
@@ -169,67 +168,30 @@ Tasarım: [spec](docs/superpowers/specs/2026-08-02-saglayici-merkezi-tasarim.md)
 
 ## Bölüm 2 — Satış Analizi
 
-**Plan durumu:** ⏳ Superpowers task planı **henüz yazılmadı.** Bölüm 1 (Task 14) bittikten
-sonra `docs/superpowers/plans/analiz/` altına yazılacak — şimdi yazmak, eşik kalibrasyonu
-gibi henüz bilinmeyen çıktıları tahmine dayandırırdı.
-
+Plan: [docs/superpowers/plans/analiz/](docs/superpowers/plans/analiz/) — 11 task,
+her biri kendi commit'i ile kapandı.
 Kavramsal arka plan (⚠️ uygulanmaz):
 [docs/bolum2-analiz/UYGULAMA-PLANI.md](docs/bolum2-analiz/UYGULAMA-PLANI.md)
 
-**Ön koşul:** Bölüm 1 Task 14 tamamlanmış olmalı.
+| # | Task | Durum | Not |
+|---|---|---|---|
+| 1 | İskelet, bağımlılıklar, geniş → tidy yükleme | ✅ | 374 seri × 124 ay doğrulandı |
+| 2 | Temizleme ve veri kalitesi raporu 🚨 | ✅ | MF ölçek tespiti sabit pazar adı kullanmıyor; B/Ürün-FR birim fiyatı 8,32 TL |
+| 3 | Türetilmiş ve analitik metrikler | ✅ | Birim fiyat `inf` üretmiyor; STL kısa seride `None` |
+| 4 | Grafik stili ve figür yazıcı | ✅ | Türkçe sayı biçimi, sabit palet, mutlak `figures/` yolu |
+| 5 | Temel tahminler + walk-forward | ✅ | Sızıntı testi; MAPE `inf` üretmiyor, WAPE/sMAPE yanında |
+| 6 | Global LightGBM + MF ablasyonu | ✅ | Seri sınırı ve indeks etiketi sızıntıları testle yakalandı |
+| 7 | Notebook: kalite raporu + A1, A2 | ✅ | Pay tablosu bulgularla uyumlu (A %12,4 · B %13,3 · C %6,1 · D %4,0) |
+| 8 | Notebook: A3, A4 | ✅ | A4'te A Pazarı anlamlı (q ≈ 9×10⁻¹², Cliff δ = −0,49) |
+| 9 | Notebook: A5, A6 | ✅ | Pay değişimi toplamı her pazarda 0; promosyon maliyeti 108,3 milyon TL |
+| 10 | Notebook: A7 | ✅ | Dört pazarda üç farklı kazanan model; MF 4 pazarın 3'ünde iyileştiriyor |
+| 11 | Kapanış: özet, figürler, README | ✅ | `Restart & Run All` hatasız, 52 hücre, 10 PNG |
 
-| Faz | Ad | Durum | Testler | Commit | Not |
-|---|---|---|---|---|---|
-| 0 | İskelet | ⬜ | — | — | |
-| 1 | Yükleme ve Temizleme ⚠️ | ⬜ | — | — | MF ölçek düzeltmesi kritik |
-| 2 | Notebook Omurgası + Veri Kalitesi Raporu | ⬜ | — | — | |
-| 3 | Görev A1–A3 | ⬜ | — | — | |
-| 4 | Görev A4–A6 | ⬜ | — | — | İstatistik ağırlıklı |
-| 5 | Görev A7 — Tahmin | ⬜ | — | — | |
-| 6 | Kapanış | ⬜ | — | — | |
-
-### Faz Detay Kontrol Listeleri
-
-**Faz 0 — İskelet**
-- [ ] 0.1 `src/analysis/`, `figures/` klasörleri
-- [ ] 0.2 `requirements-analysis.txt`
-- [ ] 0.3 Veri yolu konfigürasyonu
-- [ ] 0.4 UTF-8 notu
-
-**Faz 1 — Yükleme ve Temizleme** ⚠️
-- [ ] 1.1 `load.py` — wide → tidy (374 seri × 124 ay doğrulaması)
-- [ ] 1.2 `clean.py` — 🚨 MF ölçek tespiti + düzeltmesi (B/Ürün-FR fiyatı pozitif olmalı)
-- [ ] 1.3 `clean.py` — ürün adı normalizasyonu, MF kırpma, iade bayrağı, seri kırpma
-- [ ] 1.4 `metrics.py` — Net Kutu, Birim Fiyat, pazar payı, HHI, YoY
-- [ ] Unit + integration testler · [ ] Quality gate · [ ] Commit + push · [ ] Dosyalar güncellendi
-
-**Faz 2 — Notebook Omurgası**
-- [ ] 2.1 Notebook iskeleti (0. Veri Kalitesi + 7 görev)
-- [ ] 2.2 `plots.py` ortak stil
-- [ ] 2.3 Veri Kalitesi Raporu bölümü
-
-**Faz 3 — A1–A3**
-- [ ] 3.1 A1 Satış performansı ve ürün kırılımı
-- [ ] 3.2 A2 Pazar yapısı ve rekabet pozisyonu
-- [ ] 3.3 A3 Mevsimsellik
-
-**Faz 4 — A4–A6**
-- [ ] 4.1 A4 MF'in satışlara etkisi (olay çalışması + FDR)
-- [ ] 4.2 A5 Rakip karşılaştırması
-- [ ] 4.3 A6 Birim fiyat ve promosyon maliyeti
-
-**Faz 5 — A7 Tahmin**
-- [ ] 5.1 `forecast.py` baseline'lar + walk-forward
-- [ ] 5.2 Global LightGBM + MF ablasyonu
-- [ ] 5.3 Notebook A7 bölümü (pazar bazında MAE/MAPE/RMSE tablosu)
-
-**Faz 6 — Kapanış**
-- [ ] 6.1 Notebook `Restart & Run All` temiz
-- [ ] 6.2 Her görevde teknik + iş yorumu
-- [ ] 6.3 Figürler `figures/` altına PNG
-- [ ] 6.4 Yönetici özeti
-- [ ] 6.5 `tests/test_analysis.py` tam yeşil
-- [ ] 6.6 README Bölüm 2 adımları
+**Kabul kriterleri (PRD §4) — 11/11 doğrulandı:** notebook baştan sona hatasız
+çalışıyor · her görevde ≥1 grafik (toplam 10) · 7 teknik + 7 iş yorumu · A7'de 5 model ·
+pazar bazında MAE/MAPE/RMSE/WAPE · MF ablasyonu · A4'te p-değeri + Cliff's delta +
+FDR · MF ölçek düzeltmesi gerekçesiyle gösterilmiş · veri kalitesi raporu başta ·
+kısa seriler açıkça raporlanmış · `requirements-analysis.txt` ile kuruluyor.
 
 ---
 
@@ -260,3 +222,5 @@ Her faz kapandığında buraya bir satır eklenir.
 | 2026-08-02 | + | Sağlayıcı Merkezi Task 7–12 | `feat(ui)` | — | 4 yeni Streamlit sayfası + Ollama yöneticisi + otomatik değerlendirme |
 | 2026-08-02 | + | Sağlayıcı Merkezi Task 13 | `feat(setup)` | — | `scripts/setup.py`, `ollama-init` servisi, ADR-011/012/013, README |
 | 2026-08-03 | + | Sağlayıcı Merkezi Task 14–17 | `feat(agent)` | 247 passed, %95,05 cov | Kaynak ölçümü (`resources.py`), giriş/çıkış token sütunları, oturum belleği (`memory.py`), kullanıcı adı. Yol boyunca 5 kusur bulundu ve düzeltildi: `st.text_input` her rerun'da yeniden cevaplatıyordu, `inject_context` çıplak soruyla arıyordu, compose host portu çakışıyordu, ad yalnız sistem promptunda etkisizdi, **HNSW `search_ef` geçerli soruya ret ürettiriyordu (ADR-016)** |
+| 2026-08-04 | 2 | Task 1–6 — analiz modülleri | `feat(load)` … `feat(forecast)` | 303 passed, %95,10 cov | Yükleme, temizleme (MF ölçeği), metrikler, grafik stili, walk-forward, LightGBM + ablasyon. İki sızıntı testle yakalandı: seri sınırı ve yinelenen indeks etiketi |
+| 2026-08-04 | 2 | Task 7–11 — notebook A1–A7 + kapanış | `feat(notebook)` + `docs` | 306 passed, %95,04 cov | 52 hücre, `Restart & Run All` hatasız, 10 PNG. PRD §4'ün 11 maddesi tek tek doğrulandı. Yol boyunca 3 kusur bulundu: göreli veri yolu, göreli figür dizini, satır sayısına bakan mevsimsellik eşiği (`C/Ürün 1` için 0,99 mevsimsellik uyduruyordu) |

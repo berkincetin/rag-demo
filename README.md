@@ -420,7 +420,63 @@ otomatik değerlendirme, belge değişikliğini izleyen artımlı ingest, çok t
 
 ---
 
+## Bölüm 2 — Satış ve Talep Analizi
+
+Dört pazar × 124 ay (2016-01 → 2026-04) ilaç satış verisi üzerinde case'in yedi analiz
+sorusu. Hesaplar test edilmiş modüllerde, notebook onları çağırıp yorumluyor.
+
+```bash
+pip install -r requirements-analysis.txt
+jupyter lab notebooks/analiz.ipynb        # Restart & Run All ≈ 1,5 dk
+```
+
+| Dosya | Sorumluluk |
+|---|---|
+| `src/analysis/load.py` | Üç satırlık hiyerarşik başlığı tidy çerçeveye çevirir (374 seri × 124 ay) |
+| `src/analysis/clean.py` | Yedi ölçülmüş veri sorununu düzeltir, kalite raporu döndürür |
+| `src/analysis/metrics.py` | Net Kutu, birim fiyat, pazar payı, HHI, STL mevsimselliği |
+| `src/analysis/forecast.py` | `naive`/`snaive`/`ma3`/global LightGBM + walk-forward |
+| `src/analysis/plots.py` | Ortak Türkçe grafik stili, `figures/` PNG yazıcı |
+| `notebooks/analiz.ipynb` | A1–A7, her görevde grafik + teknik yorum + iş yorumu |
+
+### 🚨 En kritik adım: MF ölçek düzeltmesi
+
+`MF Oran` kolonu **B Pazarı'nda yüzde (0–100)**, diğer üç pazarda oran (0–1)
+ölçeğinde. Düzeltilmezse case'in `Net Kutu = Brüt Kutu × (1 − MF Oran)` tanımı
+negatif sonuç veriyor:
+
+| B Pazarı / Şirket 1 / Ürün-FR, 2016-01 | Değer |
+|---|---|
+| Ham `MF Oran` | 9,54 |
+| Oran olarak okunursa birim fiyat | **−0,88 TL** ❌ |
+| 100'e bölününce birim fiyat | **8,32 TL** ✔ |
+
+Karşılaştırma: A Pazarı/Ürün-A aynı dönemde 10,28 TL. Düzeltme yapılmadan **A4, A6 ve
+A7 görevlerinin tamamı yanlış sonuç verir**. Kural sabit "B Pazarı" kontrolüyle değil,
+**grup medyanı > 1 ⇒ yüzde ölçekli** program tespitiyle uygulanıyor; veri değişirse
+kırılmaz. Testle korunuyor: `test_mf_olcek_tespiti_yalnizca_b_pazarini_yuzde_kabul_eder`.
+
+### Bilinen sınırlılıklar (Bölüm 2)
+
+1. **Kısa seriler.** `C Pazarı/Ürün 1` yalnız **bir** ayında satış görmüş,
+   `D Pazarı/Ürün 78` on bir ayında. Bu iki seri için mevsimsellik ve tahmin
+   matematiksel olarak mümkün değil — gizlenmiyor, "yetersiz geçmiş" etiketiyle
+   ayrı tabloda raporlanıyor. Global LightGBM'in eğitim havuzunda kalıyorlar.
+2. **Ürün setleri pazarlar arası ayrık.** Şirket 1'in hiçbir ürünü birden fazla
+   pazarda yok (A'da Ürün-A…J, B'de FP…FS, C'de 1–2, D'de 77–78). Case'in "aynı
+   ürünün farklı pazarlardaki örüntüsü" sorusu bu veriyle **ürün seviyesinde
+   cevaplanamıyor**; karşılaştırma pazar seviyesine taşındı.
+3. **Fiyatlar nominal.** Veri setinde TÜFE yok, reel fiyat karşılaştırması yapılmadı.
+4. **A4 korelasyondur, nedensellik değil.** Yüksek MF satışı düşürüyor olabileceği
+   gibi, düşeceği bilinen aylarda MF artırılıyor da olabilir.
+5. **Mevsimsellik eşiği satış görülen aya bakar**, satır sayısına değil. Satır
+   sayısına bakan bir eşik `C/Ürün 1` için "mevsimsellik gücü 0,99" uyduruyordu.
+
+---
+
 ## Teslim notu
 
 `data/` klasörü `.gitignore` içindedir (kaynak belgeler repoya işlenmez). **Teslim ZIP'ine
 `data/` elle eklenmelidir** — aksi halde `python scripts/ingest.py` çalıştırılamaz.
+Aynı şey Bölüm 2 için de geçerli: `AI Engineer/bolum2_veriseti.xlsx` repoda değil,
+ZIP'e elle konmalı, yoksa notebook çalışmaz.

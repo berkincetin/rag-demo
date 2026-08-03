@@ -445,6 +445,24 @@ Dört commit: `feat(providers)`, `feat(agent)` (LangGraph), `feat(ui)`, `feat(se
 
 ---
 
+### Bölüm 2 — Satış Analizi (2026-08-04)
+
+| Konu | Öğrenilen |
+|---|---|
+| 🚨 **MF ölçek düzeltmesi ölçümle doğrulandı** | Bulgular §2.3'teki tahmin tuttu: `mf_olcek_tespit` gerçek veride yalnız `{'B Pazarı': 100.0}` döndü. Düzeltme sonrası B/Ürün-FR 2016-01 birim fiyatı **8,32 TL** (düzeltmesiz −0,88 TL). Kural pazar adına değil grup medyanına bakıyor; uydurma bir "Z Pazarı" yüzde ölçekliyse onu da yakalıyor, adı B olan oran ölçekli bir pazarı yakalamıyor — test bunu koruyor |
+| 🚨 **"Kısa seri" satır sayısıyla ölçülemez** | İki ayrı yerde aynı hataya düştüm. `C Pazarı/Ürün 1` kırpma sonrası **27 satır** taşıyor ama yalnız **bir** ayında satış var. (1) `_kisa_seriler` satır sayarken seriyi kısa görmedi. (2) `mevsimsel_indeks` aynı sebeple STL'e girdi ve tek sıçramayı **mevsimsellik gücü 0,987, zirve indeksi 8,72** diye raporladı. Doğru ölçü: **satış görülen ay sayısı**. Uydurulmuş mevsimsellik, "hesaplanamadı" demekten kötüdür |
+| 🚨 **Case'in "Diğer Şirket hacim kaybediyor" varsayımı doğrulanmadı** | Regresyonla sınandı: C'de **+6.066 kutu/ay** (p ≈ 1,6×10⁻¹⁵), D'de **+17.863 kutu/ay** (p ≈ 0,003) — anlamlı biçimde **artıyor**. A'da eğim negatif ama anlamsız (p = 0,46). Kayıp yalnız **pay** düzeyinde gerçek (A'da −12,2 puan). Varsayımı doğrulamak yerine sınamak, cevabı tersine çevirdi |
+| **A4'ün işareti beklenenin tersi çıktı** | Yüksek MF ayını izleyen ay A Pazarı'nda medyan **−%21,7** (kontrol +%1,0), Mann-Whitney p ≈ 3×10⁻¹², FDR q ≈ 9×10⁻¹², Cliff δ = −0,49. Yani MF talep yaratmıyor, **öne çekiyor** (kanal doldurma). C Pazarı'nda hiç yüksek MF olayı yok → "etki yok" değil, **"test edilemedi"** yazıldı |
+| **MAPE gerçekten patlıyor** | D Pazarı'nda `snaive` için MAPE **4.257.901**. Sıfıra yakın gerçek değerler yüzünden. WAPE aynı satırda 195,0. Case MAPE istiyor, tabloda duruyor; model seçimi WAPE'den yapılıyor (V10 kararı ölçümle haklı çıktı) |
+| **Tek model mimarisi her pazarda geçerli değil** | Dört pazarda **üç farklı kazanan**: A `snaive` (16,9), B ve C `ma3` (10,8 / 9,9), D `lgbm` (52,9). `lgbm` hiçbirinde birinci değil ama hiçbirinde kötü de değil — tek model seçilecekse en savunulabilir olanı |
+| **MF ablasyonu negatif de sonuç verdi** | MF özellikleri A, B, D'de WAPE'yi 1,2–9,8 puan **iyileştiriyor**; C'de **4,5 puan kötüleştiriyor**. C'de A4'e göre hiç MF olayı yok, yani sütun bilgi değil gürültü taşıyor. Negatif sonucu gizlememek, MF'in *ne zaman* işe yaradığını gösterdi |
+| ⚠️ **Notebook `notebooks/` içinden koşuyor** | İki göreli yol bu yüzden kırıldı: `VERI_YOLU` (FileNotFoundError) ve `FIGUR_DIZINI` (figürler `notebooks/figures/` altına yazıldı). İkisi de `Path(__file__).resolve().parents[2]` ile mutlak yapıldı, ikisi de `monkeypatch.chdir` testiyle korunuyor |
+| ⚠️ **Yinelenen indeks etiketi tahmine seri sızdırıyordu** | `lgbm_walk_forward` hedef satırları indeks etiketiyle seçiyordu; çağıran taraf `pd.concat` ile yinelenen etiket bırakınca **hedef olmaması gereken 3 aylık seri tahmin setine girdi**. `ozellik_matrisi` artık indeksi sıfırlıyor. Test kurgu veriyle bunu yakaladı |
+| **Pay değişimi toplamı sıfır çıkmıyordu** | C ve D'de üç şirketin pay değişimi toplamı −6,07 ve −4,04 çıkıyordu. Sebep: Şirket 1 o pazarlarda 2016'da **yok** ve payı `NaN`. "Pazarda yok" = "payı %0" olduğu için eksikler 0 ile dolduruldu; toplam dört pazarda da tam 0 oldu. Tutarlılık kontrolü ancak bu tanımla anlamlı |
+| **`ruff` notebook'ları da denetliyor** | `.ipynb` hücreleri E501/F401/E402 veriyor. `sys.path` bootstrap'ı ayrı hücreye alındı, kullanılmayan importlar (sonraki task'lar için erken eklenenler) temizlendi |
+
+---
+
 ## 5. Açık Sorular / Bekleyen Kararlar
 
 _(Şu an yok. Bir karar kullanıcıya sorulacaksa buraya yaz, cevap gelince §1'e taşı.)_

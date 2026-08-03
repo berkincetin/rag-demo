@@ -20,6 +20,22 @@ from src.analysis.load import ANAHTAR
 TEST_AYLARI = 12
 MIN_EGITIM_AYI = 6
 
+MF_OZELLIKLERI = ["mf_lag_0", "mf_lag_1", "mf_roll_mean_3"]
+_TEMEL_OZELLIKLER = [
+    "lag_1",
+    "lag_2",
+    "lag_3",
+    "lag_12",
+    "roll_mean_3",
+    "roll_mean_6",
+    "roll_std_3",
+    "ay",
+    "ceyrek",
+    "yil_indeksi",
+    "seri_uzunlugu",
+]
+_KATEGORIKLER = ["pazar", "urun"]
+
 Tahminci = Callable[[pd.Series], float]
 
 
@@ -112,3 +128,138 @@ def pazar_bazinda_metrikler(sonuc: pd.DataFrame) -> pd.DataFrame:
         satir.update(hata_metrikleri(grup["gercek"].to_numpy(), grup["tahmin"].to_numpy()))
         satirlar.append(satir)
     return pd.DataFrame(satirlar)
+
+
+def ozellik_matrisi(df: pd.DataFrame, mf_dahil: bool = True) -> pd.DataFrame:
+    """Gecikme, hareketli ortalama, takvim ve kategorik özellikleri üretir.
+
+    Bütün kaydırmalar `(pazar, sirket, urun)` içinde yapılır: bir serinin `lag_1`'i
+    başka bir serinin son ayı olamaz (V6). Kaydırma yönü de kritik — ters çevrilirse
+    model geleceği görür ve metrikler sahte biçimde iyi çıkar.
+    """
+    # İndeks burada sıfırlanır: hedef satırları etiketle seçiliyor ve çağıran taraf
+    # (ör. iki çerçeveyi `concat` eden notebook hücresi) yinelenen etiket bırakmış
+    # olabilir. Yinelenen etiket, hedef olmaması gereken kısa bir seriyi tahmin
+    # setine sızdırıyordu — testle yakalandı.
+    veri = df.sort_values([*ANAHTAR, "tarih"]).reset_index(drop=True)
+    veri["brut_kutu"] = veri["brut_kutu"].fillna(0.0).clip(lower=0.0)
+    grup = veri.groupby(ANAHTAR, observed=True)["brut_kutu"]
+
+    for gecikme in (1, 2, 3, 12):
+        veri[f"lag_{gecikme}"] = grup.shift(gecikme)
+    kaydirilmis = grup.shift(1)
+    veri["roll_mean_3"] = kaydirilmis.groupby([veri[k] for k in ANAHTAR], observed=True).transform(
+        lambda s: s.rolling(3).mean()
+    )
+    veri["roll_mean_6"] = kaydirilmis.groupby([veri[k] for k in ANAHTAR], observed=True).transform(
+        lambda s: s.rolling(6).mean()
+    )
+    veri["roll_std_3"] = kaydirilmis.groupby([veri[k] for k in ANAHTAR], observed=True).transform(
+        lambda s: s.rolling(3).std()
+    )
+
+    veri["ay"] = veri["tarih"].dt.month
+    veri["ceyrek"] = veri["tarih"].dt.quarter
+    veri["yil_indeksi"] = veri["tarih"].dt.year - int(veri["tarih"].dt.year.min())
+    veri["seri_uzunlugu"] = veri.groupby(ANAHTAR, observed=True)["tarih"].transform("size")
+
+    if mf_dahil:
+        mf = veri.groupby(ANAHTAR, observed=True)["mf_oran_temiz"]
+        veri["mf_lag_0"] = veri["mf_oran_temiz"]
+        veri["mf_lag_1"] = mf.shift(1)
+        veri["mf_roll_mean_3"] = (
+            mf.shift(1)
+            .groupby([veri[k] for k in ANAHTAR], observed=True)
+            .transform(lambda s: s.rolling(3).mean())
+        )
+    else:
+        veri = veri.drop(columns=[s for s in MF_OZELLIKLERI if s in veri.columns])
+
+    return veri
+
+
+def lgbm_walk_forward(
+    df: pd.DataFrame, mf_dahil: bool = True, ay_sayisi: int = TEST_AYLARI
+) -> pd.DataFrame:
+    """Global LightGBM'i walk-forward değerlendirir.
+
+    Tek model bütün serileri birlikte öğrenir; kısa seriler eğitim havuzunda kalır
+    ama hedef olarak seçilmez (geçmişleri yetersiz). Hedef `log1p` ölçeğinde:
+    hacimler pazarlar arası üç mertebe farklı ve log ölçek olmadan büyük serilerin
+    kaybı modeli domine eder. Tahmin `expm1` ile geri çevrilip 0'a kırpılır.
+    """
+    import lightgbm as lgb
+
+    matris = ozellik_matrisi(df, mf_dahil=mf_dahil)
+    ozellikler = list(_TEMEL_OZELLIKLER)
+    if mf_dahil:
+        ozellikler += MF_OZELLIKLERI
+    for sutun in _KATEGORIKLER:
+        matris[sutun] = matris[sutun].astype("category")
+
+    hedef_tarihler = _hedef_tarihler(matris, ay_sayisi)
+    satirlar = []
+    for hedef in sorted(hedef_tarihler):
+        egitim = matris[matris["tarih"] < hedef]
+        test = matris[(matris["tarih"] == hedef) & (matris.index.isin(hedef_tarihler[hedef]))]
+        if egitim.empty or test.empty:
+            continue
+        model = lgb.LGBMRegressor(
+            n_estimators=300,
+            learning_rate=0.05,
+            num_leaves=31,
+            min_child_samples=10,
+            random_state=42,
+            verbose=-1,
+        )
+        model.fit(
+            egitim[ozellikler + _KATEGORIKLER],
+            np.log1p(egitim["brut_kutu"]),
+            categorical_feature=_KATEGORIKLER,
+        )
+        tahmin = np.expm1(model.predict(test[ozellikler + _KATEGORIKLER])).clip(min=0.0)
+        satirlar.append(
+            pd.DataFrame(
+                {
+                    "pazar": test["pazar"].astype(str).to_numpy(),
+                    "sirket": test["sirket"].astype(str).to_numpy(),
+                    "urun": test["urun"].astype(str).to_numpy(),
+                    "tarih": test["tarih"].to_numpy(),
+                    "gercek": test["brut_kutu"].to_numpy(),
+                    "tahmin": tahmin,
+                }
+            )
+        )
+
+    if not satirlar:
+        return pd.DataFrame(columns=["pazar", "sirket", "urun", "tarih", "gercek", "tahmin"])
+    return (
+        pd.concat(satirlar).sort_values(["pazar", "sirket", "urun", "tarih"]).reset_index(drop=True)
+    )
+
+
+def _hedef_tarihler(matris: pd.DataFrame, ay_sayisi: int) -> dict[pd.Timestamp, list[int]]:
+    """Hangi ayda hangi satırların tahmin edileceği.
+
+    Temel modellerle **aynı** seri seçimini kullanır ki karşılaştırma adil olsun ve
+    ablasyonun iki tarafı aynı katmanlarda değerlendirilsin.
+    """
+    hedefler: dict[pd.Timestamp, list[int]] = {}
+    for _, grup in matris.groupby(ANAHTAR, observed=True):
+        sirali = grup.sort_values("tarih")
+        if len(sirali) < MIN_EGITIM_AYI + 1:
+            continue
+        secilen = sirali.iloc[-min(ay_sayisi, len(sirali) - MIN_EGITIM_AYI) :]
+        for indeks, tarih in zip(secilen.index, secilen["tarih"], strict=True):
+            hedefler.setdefault(tarih, []).append(indeks)
+    return hedefler
+
+
+def mf_ablasyonu(df: pd.DataFrame, ay_sayisi: int = TEST_AYLARI) -> pd.DataFrame:
+    """`lgbm` ile `lgbm_no_mf`'i pazar bazında karşılaştırır."""
+    mf_ile = pazar_bazinda_metrikler(lgbm_walk_forward(df, mf_dahil=True, ay_sayisi=ay_sayisi))
+    mf_siz = pazar_bazinda_metrikler(lgbm_walk_forward(df, mf_dahil=False, ay_sayisi=ay_sayisi))
+    birlesik = mf_ile.merge(mf_siz, on="pazar", suffixes=("_mf_ile", "_mf_siz"))
+    birlesik["mae_farki"] = birlesik["mae_mf_siz"] - birlesik["mae_mf_ile"]
+    birlesik["wape_farki"] = birlesik["wape_mf_siz"] - birlesik["wape_mf_ile"]
+    return birlesik

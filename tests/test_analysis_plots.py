@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import pytest  # noqa: E402
 
 from src.analysis.plots import (  # noqa: E402
+    FIGUR_DIZINI,
     PAZAR_RENKLERI,
     SIRKET_RENKLERI,
     kaydet,
@@ -54,3 +55,11 @@ def test_stil_uygula_turkce_eksen_ayirici_kuruyor():
 
     assert plt.rcParams["axes.grid"] is True
     assert plt.rcParams["figure.dpi"] == pytest.approx(110)
+
+
+def test_varsayilan_figur_dizini_calisma_dizininden_bagimsiz(tmp_path, monkeypatch):
+    # Notebook `notebooks/` içinden koşuyor; göreli varsayılan figürleri oraya yazardı.
+    monkeypatch.chdir(tmp_path)
+
+    assert FIGUR_DIZINI.is_absolute()
+    assert FIGUR_DIZINI.name == "figures"

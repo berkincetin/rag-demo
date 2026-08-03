@@ -8,7 +8,9 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-FIGUR_DIZINI = Path("figures")
+# Depo köküne göre mutlak: notebook `notebooks/` içinden koşuyor ve göreli bir
+# varsayılan figürleri `notebooks/figures/` altına yazıyordu.
+FIGUR_DIZINI = Path(__file__).resolve().parents[2] / "figures"
 
 PAZAR_RENKLERI = {
     "A Pazarı": "#1f77b4",

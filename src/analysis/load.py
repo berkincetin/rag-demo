@@ -9,7 +9,10 @@ from pathlib import Path
 
 import pandas as pd
 
-VERI_YOLU = Path("AI Engineer/bolum2_veriseti.xlsx")
+# Depo köküne göre mutlak yol: notebook `notebooks/` içinden koşuyor ve göreli bir
+# yol oradan çözülmüyordu.
+_DEPO_KOKU = Path(__file__).resolve().parents[2]
+VERI_YOLU = _DEPO_KOKU / "AI Engineer" / "bolum2_veriseti.xlsx"
 ANAHTAR = ["pazar", "sirket", "urun"]
 
 AY_ADLARI = {

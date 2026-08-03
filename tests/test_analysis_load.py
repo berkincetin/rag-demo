@@ -60,3 +60,11 @@ def test_sirket_1_on_sekiz_seriye_sahip(ham):
     # Bulgular §2.2: A'da 10, B'de 4, C'de 2, D'de 2.
     s1 = ham[ham["sirket"] == "Şirket 1"]
     assert len(s1.groupby(["pazar", "urun"], observed=True)) == 18
+
+
+@pytest.mark.integration
+def test_calisma_dizininden_bagimsiz_yukluyor(ham, tmp_path, monkeypatch):
+    # Notebook `notebooks/` içinden koşuyor; göreli yol oradan çözülmezdi.
+    monkeypatch.chdir(tmp_path)
+
+    assert len(yukle_ham()) == len(ham)

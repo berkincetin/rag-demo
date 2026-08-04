@@ -292,7 +292,15 @@ regenerable, `__pycache__/`, notebook checkpoints.
 |---|---|
 | **Part 1 code** (`src/rag/`, `app.py`, `scripts/`, `tests/`) | **English** — identifiers, comments, docstrings, log messages, all of it |
 | **Part 1 user-facing strings** | **Turkish** — Streamlit UI labels, LLM system prompt, refusal/no-info templates, CLI prompts |
-| **Part 2 code** (`src/analysis/`, `notebooks/analiz.ipynb`) | **Turkish** — identifiers, comments, docstrings, DataFrame column names (`brut_kutu`, `mf_oran`, `net_tl`, `pazar`, `sirket`, `urun`). The domain terms come from the dataset; keeping them Turkish preserves traceability to the source data |
+| **Part 2 identifiers** (`src/analysis/`, `notebooks/analiz.ipynb`, `tests/test_analysis_*.py`) | **English** — function names, variable names, class names, constants, test names. Same as Part 1 |
+| **Part 2 comments, docstrings and markdown cells** | **Turkish** — every comment, docstring and notebook narrative cell |
+| **Part 2 DataFrame column names** | **Turkish** — `pazar`, `sirket`, `urun`, `tarih`, `brut_kutu`, `mf_oran`, `net_tl`, `mf_oran_temiz`, `net_kutu`, `birim_fiyat`, `gercek`, `tahmin`. These mirror the dataset's own headers (`Brüt Kutu`, `MF Oran`, `Net TL`) and keep the data contract traceable to the source workbook. **They are data, not identifiers — never rename them** |
+
+> ⚠️ Part 2 originally used Turkish identifiers; the user changed this on 2026-08-04.
+> When renaming, beware that a blanket regex will also hit Turkish comments and string
+> literals (it turned "tahmin edilmedi" into "prediction edilmedi") and DataFrame column
+> names inside `.query()` strings. Rename deliberately, then re-run the notebook and
+> diff the outputs — they must be identical.
 | Commit messages | English (both parts) |
 | `docs/`, `PROGRESSION.md`, `MEMORY.md` | Turkish |
 | `CLAUDE.md`, `README.md` | English (README may include a Turkish section if useful) |

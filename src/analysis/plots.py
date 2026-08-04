@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 
 # Depo köküne göre mutlak: notebook `notebooks/` içinden koşuyor ve göreli bir
 # varsayılan figürleri `notebooks/figures/` altına yazıyordu.
-FIGUR_DIZINI = Path(__file__).resolve().parents[2] / "figures"
+FIGURE_DIR = Path(__file__).resolve().parents[2] / "figures"
 
-PAZAR_RENKLERI = {
+MARKET_COLORS = {
     "A Pazarı": "#1f77b4",
     "B Pazarı": "#d62728",
     "C Pazarı": "#2ca02c",
@@ -20,14 +20,14 @@ PAZAR_RENKLERI = {
 }
 
 # Şirket 1 analizin öznesi olduğu için vurgulu; rakipler kasıtlı olarak nötr.
-SIRKET_RENKLERI = {
+COMPANY_COLORS = {
     "Şirket 1": "#d62728",
     "Şirket 2": "#7f7f7f",
     "Diğer Şirket": "#c7c7c7",
 }
 
 
-def stil_uygula() -> None:
+def apply_style() -> None:
     """Notebook genelinde geçerli matplotlib ayarlarını kurar."""
     plt.rcParams.update(
         {
@@ -46,16 +46,16 @@ def stil_uygula() -> None:
     )
 
 
-def tr_sayi(x: float, ondalik: int = 0) -> str:
+def tr_number(x: float, decimals: int = 0) -> str:
     """Türkçe sayı biçimi: binlik ayracı nokta, ondalık ayracı virgül."""
-    metin = f"{x:,.{ondalik}f}"
-    return metin.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+    text = f"{x:,.{decimals}f}"
+    return text.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
 
 
-def kaydet(fig, ad: str, dizin: Path = FIGUR_DIZINI) -> Path:
+def save_figure(fig, name: str, directory: Path = FIGURE_DIR) -> Path:
     """Figürü PNG olarak yazar ve yolunu döndürür."""
-    dizin = Path(dizin)
-    dizin.mkdir(parents=True, exist_ok=True)
-    yol = dizin / f"{ad}.png"
-    fig.savefig(yol, bbox_inches="tight")
-    return yol
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{name}.png"
+    fig.savefig(path, bbox_inches="tight")
+    return path

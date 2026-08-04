@@ -15,7 +15,7 @@ hesap yapılmaz, aşağıdaki hücrelerden gelen değerler kullanılır.
 
 - [ ] **Adım 2: Tüm figürleri `figures/` altına yaz**
 
-Her grafik `plots.kaydet(fig, ad)` ile PNG olarak da kaydedilir (README/sunum için).
+Her grafik `plots.save_figure(fig, ad)` ile PNG olarak da kaydedilir (README/sunum için).
 
 - [ ] **Adım 3: Restart & Run All**
 
@@ -68,5 +68,5 @@ sessizce atlanmaz.
 | 7 | MF ölçek düzeltmesi uygulanmış ve gerekçesi gösterilmiş | ✅ düzeltmeli/düzeltmesiz fiyat tablosu |
 | 8 | Veri kalitesi raporu notebook başında | ✅ 7 satırlık tablo |
 | 9 | Kısa seriler gizlenmemiş, açıkça raporlanmış | ✅ iki ayrı tabloda "yetersiz geçmiş" |
-| 10 | Grafiklerde Türkçe eksen etiketi ve başlık | ✅ `plots.stil_uygula` + `tr_sayi` |
+| 10 | Grafiklerde Türkçe eksen etiketi ve başlık | ✅ `plots.apply_style` + `tr_sayi` |
 | 11 | `pip install -r requirements-analysis.txt` ile kuruluyor | ✅ 9 paket, sürümler `pip freeze`'den |

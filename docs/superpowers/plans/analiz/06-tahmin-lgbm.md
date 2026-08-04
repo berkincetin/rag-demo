@@ -8,11 +8,11 @@
 ## Interfaces
 
 ```python
-MF_OZELLIKLERI = ["mf_lag_0", "mf_lag_1", "mf_roll_mean_3"]
+MF_FEATURES = ["mf_lag_0", "mf_lag_1", "mf_roll_mean_3"]
 
-def ozellik_matrisi(df) -> pd.DataFrame        # lag/roll/takvim/kategorik + MF
-def lgbm_walk_forward(df, mf_dahil=True, ay_sayisi=TEST_AYLARI) -> pd.DataFrame
-def mf_ablasyonu(df) -> pd.DataFrame           # pazar → lgbm vs lgbm_no_mf delta
+def feature_matrix(df) -> pd.DataFrame        # lag/roll/takvim/kategorik + MF
+def lgbm_walk_forward(df, with_mf=True, months=TEST_MONTHS) -> pd.DataFrame
+def mf_ablation(df) -> pd.DataFrame           # pazar → lgbm vs lgbm_no_mf delta
 ```
 
 Özellikler (TRD §5): `lag_1, lag_2, lag_3, lag_12`, `roll_mean_3, roll_mean_6, roll_std_3`,
@@ -24,8 +24,8 @@ def mf_ablasyonu(df) -> pd.DataFrame           # pazar → lgbm vs lgbm_no_mf de
 
 | Test | Doğruladığı |
 |---|---|
-| `test_ozellik_matrisi_gecmisten_gelecege_bakmiyor` | 🚨 `lag_1` gerçekten bir önceki ay; kaydırma yönü kurgu seride ispatlanır |
-| `test_ozellik_matrisi_seri_sinirini_asmiyor` | 🚨 Bir serinin `lag_1`'i başka serinin son ayı **değil** (V6 anahtar) |
+| `test_the_lag_features_point_backwards_in_time` | 🚨 `lag_1` gerçekten bir önceki ay; kaydırma yönü kurgu seride ispatlanır |
+| `test_lags_never_cross_a_series_boundary` | 🚨 Bir serinin `lag_1`'i başka serinin son ayı **değil** (V6 anahtar) |
 | `test_mf_ablasyonunda_mf_kolonlari_yok` | `mf_dahil=False` → `MF_OZELLIKLERI` matriste geçmiyor |
 | `test_log_donusumu_geri_cevriliyor` | `expm1(log1p(x)) == x` ve tahminler negatif değil |
 | `test_lgbm_kisa_serileri_egitim_havuzunda_tutuyor` | Global model onlardan da öğreniyor; per-seri tabloda "yetersiz geçmiş" etiketi |

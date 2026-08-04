@@ -6,60 +6,60 @@ import matplotlib.pyplot as plt  # noqa: E402
 import pytest  # noqa: E402
 
 from src.analysis.plots import (  # noqa: E402
-    FIGUR_DIZINI,
-    PAZAR_RENKLERI,
-    SIRKET_RENKLERI,
-    kaydet,
-    stil_uygula,
-    tr_sayi,
+    COMPANY_COLORS,
+    FIGURE_DIR,
+    MARKET_COLORS,
+    apply_style,
+    save_figure,
+    tr_number,
 )
 
 
-def test_tr_sayi_binlik_nokta_ondalik_virgul():
-    assert tr_sayi(1234567.8, ondalik=1) == "1.234.567,8"
+def test_turkish_number_uses_dot_thousands_and_comma_decimals():
+    assert tr_number(1234567.8, decimals=1) == "1.234.567,8"
 
 
-def test_tr_sayi_ondaliksiz_yuvarliyor():
-    assert tr_sayi(1234.6) == "1.235"
+def test_turkish_number_rounds_without_decimals():
+    assert tr_number(1234.6) == "1.235"
 
 
-def test_tr_sayi_negatif_ve_sifir():
-    assert tr_sayi(-1234.5, ondalik=1) == "-1.234,5"
-    assert tr_sayi(0) == "0"
+def test_turkish_number_handles_negatives_and_zero():
+    assert tr_number(-1234.5, decimals=1) == "-1.234,5"
+    assert tr_number(0) == "0"
 
 
-def test_dort_pazarin_da_rengi_tanimli():
+def test_all_four_markets_have_a_colour():
     # Grafiğin ortasında KeyError almamak için palet eksiksiz olmalı.
     for pazar in ("A Pazarı", "B Pazarı", "C Pazarı", "D Pazarı"):
-        assert pazar in PAZAR_RENKLERI
+        assert pazar in MARKET_COLORS
 
 
-def test_uc_sirketin_de_rengi_tanimli():
+def test_all_three_companies_have_a_colour():
     for sirket in ("Şirket 1", "Şirket 2", "Diğer Şirket"):
-        assert sirket in SIRKET_RENKLERI
+        assert sirket in COMPANY_COLORS
 
 
-def test_kaydet_png_uretiyor_ve_yol_donduruyor(tmp_path):
-    fig, eksen = plt.subplots()
-    eksen.plot([1, 2, 3], [1, 4, 9])
+def test_saving_writes_a_png_and_returns_its_path(tmp_path):
+    fig, axis = plt.subplots()
+    axis.plot([1, 2, 3], [1, 4, 9])
 
-    yol = kaydet(fig, "deneme", dizin=tmp_path)
+    path = save_figure(fig, "deneme", directory=tmp_path)
     plt.close(fig)
 
-    assert yol == tmp_path / "deneme.png"
-    assert yol.stat().st_size > 0
+    assert path == tmp_path / "deneme.png"
+    assert path.stat().st_size > 0
 
 
-def test_stil_uygula_turkce_eksen_ayirici_kuruyor():
-    stil_uygula()
+def test_applying_the_style_sets_the_shared_defaults():
+    apply_style()
 
     assert plt.rcParams["axes.grid"] is True
     assert plt.rcParams["figure.dpi"] == pytest.approx(110)
 
 
-def test_varsayilan_figur_dizini_calisma_dizininden_bagimsiz(tmp_path, monkeypatch):
+def test_the_default_figure_directory_is_working_directory_independent(tmp_path, monkeypatch):
     # Notebook `notebooks/` içinden koşuyor; göreli varsayılan figürleri oraya yazardı.
     monkeypatch.chdir(tmp_path)
 
-    assert FIGUR_DIZINI.is_absolute()
-    assert FIGUR_DIZINI.name == "figures"
+    assert FIGURE_DIR.is_absolute()
+    assert FIGURE_DIR.name == "figures"

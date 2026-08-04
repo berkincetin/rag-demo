@@ -8,14 +8,14 @@
 ## Interfaces
 
 ```python
-def turetilmis_metrikler(df) -> pd.DataFrame      # net_kutu, birim_fiyat ekler
-def pazar_payi(df, metrik="brut_kutu") -> pd.DataFrame   # pazar-ay-şirket %
+def derived_metrics(df) -> pd.DataFrame      # net_kutu, birim_fiyat ekler
+def market_share(df, metric="brut_kutu") -> pd.DataFrame   # pazar-ay-şirket %
 def hhi(df) -> pd.DataFrame                        # pazar-ay → 0–10.000
-def yillik_buyume(df) -> pd.DataFrame              # pazar-şirket-yıl → %
-def mevsimsel_indeks(seri: pd.Series) -> pd.Series | None   # ay → çarpan, <24 ay ise None
-def mevsimsellik_gucu(seri: pd.Series) -> float | None      # Hyndman, 0–1
-def promosyon_gelir_kaybi(df) -> pd.DataFrame      # yıl-pazar-ürün → TL
-def fiyat_sapmasi(df) -> pd.DataFrame              # ürün → pazarlar arası CV
+def yoy_growth(df) -> pd.DataFrame              # pazar-şirket-yıl → %
+def seasonal_index(series: pd.Series) -> pd.Series | None   # ay → çarpan, <24 ay ise None
+def seasonality_strength(series: pd.Series) -> float | None      # Hyndman, 0–1
+def promo_revenue_loss(df) -> pd.DataFrame      # yıl-pazar-ürün → TL
+def price_dispersion(df) -> pd.DataFrame              # ürün → pazarlar arası CV
 ```
 
 ---

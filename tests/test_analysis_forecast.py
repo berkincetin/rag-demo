@@ -3,117 +3,117 @@ import pandas as pd
 import pytest
 
 from src.analysis.forecast import (
-    hata_metrikleri,
+    error_metrics,
     ma3,
+    metrics_by_market,
     naive,
-    pazar_bazinda_metrikler,
     snaive,
     walk_forward,
 )
 
 
-def _seri(pazar="A Pazarı", urun="Ürün-A", aylar=36, baslangic=100.0, artis=1.0):
-    tarih = pd.date_range("2020-01-01", periods=aylar, freq="MS")
+def _series(pazar="A Pazarı", urun="Ürün-A", months_=36, start=100.0, step=1.0):
+    tarih = pd.date_range("2020-01-01", periods=months_, freq="MS")
     return pd.DataFrame(
         {
             "pazar": pazar,
             "sirket": "Şirket 1",
             "urun": urun,
             "tarih": tarih,
-            "brut_kutu": [baslangic + artis * i for i in range(aylar)],
+            "brut_kutu": [start + step * i for i in range(months_)],
             "mf_oran_temiz": 0.1,
         }
     )
 
 
-def test_naive_son_gozlemi_donduruyor():
+def test_naive_returns_the_last_observation():
     assert naive(pd.Series([5.0, 9.0, 12.0])) == pytest.approx(12.0)
 
 
-def test_snaive_on_iki_ay_oncesini_donduruyor():
-    gecmis = pd.Series(range(24), dtype=float)
+def test_snaive_returns_the_value_twelve_months_back():
+    history = pd.Series(range(24), dtype=float)
 
-    assert snaive(gecmis) == pytest.approx(12.0)
+    assert snaive(history) == pytest.approx(12.0)
 
 
-def test_snaive_kisa_gecmiste_naive_e_dusuyor():
+def test_snaive_falls_back_to_naive_on_short_history():
     # 12 aydan kısa geçmişte mevsimsel referans yok; sessizce hata vermemeli.
-    gecmis = pd.Series([3.0, 7.0])
+    history = pd.Series([3.0, 7.0])
 
-    assert snaive(gecmis) == pytest.approx(7.0)
+    assert snaive(history) == pytest.approx(7.0)
 
 
-def test_ma3_son_uc_ayin_ortalamasi():
+def test_ma3_averages_the_last_three_months():
     assert ma3(pd.Series([1.0, 2.0, 3.0, 4.0, 5.0])) == pytest.approx(4.0)
 
 
-def test_walk_forward_gelecegi_sizdirmiyor():
+def test_walk_forward_never_leaks_the_future():
     # 🚨 Her katmanda tahminci yalnız t anına kadarki geçmişi görmeli.
-    gorulen_son_tarihler = []
+    seen_last_dates = []
 
-    def kaydeden_tahminci(gecmis: pd.Series) -> float:
-        gorulen_son_tarihler.append(gecmis.index.max())
-        return float(gecmis.iloc[-1])
+    def recording_forecaster(history: pd.Series) -> float:
+        seen_last_dates.append(history.index.max())
+        return float(history.iloc[-1])
 
-    df = _seri(aylar=36)
-    sonuc = walk_forward(df, kaydeden_tahminci, ay_sayisi=3)
+    df = _series(months_=36)
+    result = walk_forward(df, recording_forecaster, months=3)
 
-    for gorulen, hedef in zip(gorulen_son_tarihler, sonuc["tarih"], strict=True):
+    for gorulen, hedef in zip(seen_last_dates, result["tarih"], strict=True):
         assert gorulen < hedef
 
 
-def test_walk_forward_bir_ay_ileri_tahmin_ediyor():
-    df = _seri(aylar=36)
+def test_walk_forward_predicts_one_month_ahead():
+    df = _series(months_=36)
 
-    sonuc = walk_forward(df, naive, ay_sayisi=3)
+    result = walk_forward(df, naive, months=3)
 
-    assert len(sonuc) == 3
-    assert sonuc["tarih"].tolist() == df["tarih"].tolist()[-3:]
-    # naive: t+1 tahmini t'nin değeri → gerçek her zaman 1 fazla (artis=1.0).
-    assert (sonuc["gercek"] - sonuc["tahmin"]).round(6).eq(1.0).all()
+    assert len(result) == 3
+    assert result["tarih"].tolist() == df["tarih"].tolist()[-3:]
+    # naive: t+1 tahmini t'nin değeri → gerçek her zaman 1 fazla (step=1.0).
+    assert (result["gercek"] - result["tahmin"]).round(6).eq(1.0).all()
 
 
-def test_walk_forward_kisa_seriyi_atliyor():
+def test_walk_forward_skips_a_series_that_is_too_short():
     # `C/Ürün 1` gibi tek gözlemli seriler kodu kırmamalı.
-    kisa = _seri(pazar="C Pazarı", urun="Ürün 1", aylar=1)
-    uzun = _seri(aylar=36)
+    short = _series(pazar="C Pazarı", urun="Ürün 1", months_=1)
+    long_ = _series(months_=36)
 
-    sonuc = walk_forward(pd.concat([kisa, uzun]), naive, ay_sayisi=3)
+    result = walk_forward(pd.concat([short, long_]), naive, months=3)
 
-    assert set(sonuc["urun"]) == {"Ürün-A"}
+    assert set(result["urun"]) == {"Ürün-A"}
 
 
-def test_mape_sifir_gercek_degerde_patlamiyor():
+def test_mape_does_not_explode_on_zero_actuals():
     # 🚨 V10: y = 0 gözlemler MAPE'den dışlanır, `inf` üretmez.
-    metrikler = hata_metrikleri(np.array([0.0, 100.0]), np.array([5.0, 90.0]))
+    measures = error_metrics(np.array([0.0, 100.0]), np.array([5.0, 90.0]))
 
-    assert np.isfinite(metrikler["mape"])
-    assert metrikler["mape"] == pytest.approx(10.0)
+    assert np.isfinite(measures["mape"])
+    assert measures["mape"] == pytest.approx(10.0)
 
 
-def test_wape_sifir_dayanikli():
-    metrikler = hata_metrikleri(np.array([0.0, 100.0]), np.array([5.0, 90.0]))
+def test_wape_is_robust_to_zeros():
+    measures = error_metrics(np.array([0.0, 100.0]), np.array([5.0, 90.0]))
 
     # Σ|hata| = 5 + 10 = 15; Σy = 100 → %15.
-    assert metrikler["wape"] == pytest.approx(15.0)
+    assert measures["wape"] == pytest.approx(15.0)
 
 
-def test_hic_pozitif_gercek_yoksa_mape_nan():
-    metrikler = hata_metrikleri(np.array([0.0, 0.0]), np.array([1.0, 2.0]))
+def test_mape_is_nan_when_no_actual_is_positive():
+    measures = error_metrics(np.array([0.0, 0.0]), np.array([1.0, 2.0]))
 
-    assert np.isnan(metrikler["mape"])
-
-
-def test_hata_metrikleri_bilinen_degerlerle():
-    metrikler = hata_metrikleri(np.array([10.0, 20.0]), np.array([12.0, 18.0]))
-
-    assert metrikler["mae"] == pytest.approx(2.0)
-    assert metrikler["rmse"] == pytest.approx(2.0)
+    assert np.isnan(measures["mape"])
 
 
-def test_pazar_bazinda_metrikler_her_pazari_ayri_veriyor():
+def test_error_metrics_on_hand_computed_values():
+    measures = error_metrics(np.array([10.0, 20.0]), np.array([12.0, 18.0]))
+
+    assert measures["mae"] == pytest.approx(2.0)
+    assert measures["rmse"] == pytest.approx(2.0)
+
+
+def test_metrics_are_reported_per_market():
     # 🚨 Bulgular §2.5: 18 serinin 10'u A Pazarı'nda; genel ortalama diğerlerini maskeler.
-    sonuc = pd.DataFrame(
+    result = pd.DataFrame(
         {
             "pazar": ["A Pazarı", "A Pazarı", "D Pazarı"],
             "sirket": "Şirket 1",
@@ -124,7 +124,7 @@ def test_pazar_bazinda_metrikler_her_pazari_ayri_veriyor():
         }
     )
 
-    tablo = pazar_bazinda_metrikler(sonuc)
+    table = metrics_by_market(result)
 
-    assert set(tablo["pazar"]) == {"A Pazarı", "D Pazarı"}
-    assert tablo[tablo["pazar"] == "D Pazarı"]["mae"].iloc[0] == pytest.approx(10.0)
+    assert set(table["pazar"]) == {"A Pazarı", "D Pazarı"}
+    assert table[table["pazar"] == "D Pazarı"]["mae"].iloc[0] == pytest.approx(10.0)

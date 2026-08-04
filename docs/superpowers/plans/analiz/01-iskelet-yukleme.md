@@ -9,11 +9,11 @@
 ## Interfaces (sonraki task'lar bunlara dayanır)
 
 ```python
-VERI_YOLU = Path("AI Engineer/bolum2_veriseti.xlsx")
-ANAHTAR = ["pazar", "sirket", "urun"]
-AY_ADLARI: dict[str, int]                     # 'Ocak' → 1 … 'Aralık' → 12
+DATA_PATH = Path("AI Engineer/bolum2_veriseti.xlsx")
+KEY = ["pazar", "sirket", "urun"]
+MONTH_NAMES: dict[str, int]                     # 'Ocak' → 1 … 'Aralık' → 12
 
-def yukle_ham(yol: Path = VERI_YOLU) -> pd.DataFrame:
+def load_raw(path: Path = DATA_PATH) -> pd.DataFrame:
     """Geniş formatlı sayfayı tidy çerçeveye çevirir.
     Kolonlar: pazar, sirket, urun, tarih, brut_kutu, mf_oran, net_tl."""
 ```
@@ -27,56 +27,56 @@ def yukle_ham(yol: Path = VERI_YOLU) -> pd.DataFrame:
 import pandas as pd
 import pytest
 
-from src.analysis.load import AY_ADLARI, VERI_YOLU, yukle_ham
+from src.analysis.load import MONTH_NAMES, DATA_PATH, load_raw
 
 
 @pytest.fixture(scope="module")
-def ham() -> pd.DataFrame:
-    if not VERI_YOLU.exists():
-        pytest.skip(f"veri seti yok: {VERI_YOLU}")
-    return yukle_ham()
+def raw() -> pd.DataFrame:
+    if not DATA_PATH.exists():
+        pytest.skip(f"veri seti yok: {DATA_PATH}")
+    return load_raw()
 
 
-def test_ay_adlari_on_ikisi_de_var():
+def test_all_twelve_month_names_are_mapped():
     # Ay adları veride doğrulandı (bulgular §2.1); eksik ad sessiz NaT üretir.
-    assert len(AY_ADLARI) == 12
-    assert AY_ADLARI["Ocak"] == 1
-    assert AY_ADLARI["Aralık"] == 12
+    assert len(MONTH_NAMES) == 12
+    assert MONTH_NAMES["Ocak"] == 1
+    assert MONTH_NAMES["Aralık"] == 12
 
 
 @pytest.mark.integration
-def test_tidy_cerceve_beklenen_kolonlari_tasiyor(ham):
+def test_the_tidy_frame_carries_the_expected_columns(raw):
     assert list(ham.columns) == [
         "pazar", "sirket", "urun", "tarih", "brut_kutu", "mf_oran", "net_tl"
     ]
 
 
 @pytest.mark.integration
-def test_seri_ve_ay_sayisi_olculen_degerlerle_ayni(ham):
+def test_seri_ve_ay_sayisi_olculen_degerlerle_ayni(raw):
     # Bulgular §2.1: 374 seri × 124 ay.
     assert ham["tarih"].nunique() == 124
     assert len(ham.groupby(["pazar", "sirket", "urun"], observed=True)) == 374
 
 
 @pytest.mark.integration
-def test_tarih_araligi_2016_01_ile_2026_04_arasi(ham):
+def test_tarih_araligi_2016_01_ile_2026_04_arasi(raw):
     assert ham["tarih"].min() == pd.Timestamp("2016-01-01")
     assert ham["tarih"].max() == pd.Timestamp("2026-04-01")
 
 
 @pytest.mark.integration
-def test_anahtar_ay_ciftleri_yinelenmiyor(ham):
+def test_anahtar_ay_ciftleri_yinelenmiyor(raw):
     assert not ham.duplicated(["pazar", "sirket", "urun", "tarih"]).any()
 
 
 @pytest.mark.integration
-def test_bos_hucreler_sifira_cevrilmemis(ham):
+def test_bos_hucreler_sifira_cevrilmemis(raw):
     # Bulgular §2.4: 28.006 boş hücre ürün yaşam döngüsü, gerçek sıfır değil (V5).
     assert ham["brut_kutu"].isna().sum() > 0
 
 
 @pytest.mark.integration
-def test_sirket_1_on_sekiz_seriye_sahip(ham):
+def test_sirket_1_on_sekiz_seriye_sahip(raw):
     s1 = ham[ham["sirket"] == "Şirket 1"]
     assert len(s1.groupby(["pazar", "urun"], observed=True)) == 18
 ```
@@ -110,7 +110,7 @@ git commit -m "feat(load): add wide-to-tidy loader for the sales workbook"
 
 ## Definition of Done
 - [ ] 7 test yeşil
-- [ ] `yukle_ham()` gerçek veri setinde 374 seri × 124 ay döndürüyor
+- [ ] `load_raw()` gerçek veri setinde 374 seri × 124 ay döndürüyor
 - [ ] Boş hücreler `NaN` kalmış, 0'a çevrilmemiş
 - [ ] Metrik adı beklenenden farklıysa `ValueError` fırlatılıyor
 - [ ] `requirements-analysis.txt` gerçek kurulu sürümlerle yazıldı

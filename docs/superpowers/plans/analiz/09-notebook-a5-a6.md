@@ -23,7 +23,7 @@
 - [ ] **Adım 2: A6 — birim fiyat trendi ve promosyon maliyeti**
 
 - Ürün × pazar aylık birim fiyat serisi; yıllık ortalama + CAGR.
-- Aynı ürünün pazarlar arası fiyat sapması — `fiyat_sapmasi` (CV).
+- Aynı ürünün pazarlar arası fiyat sapması — `price_dispersion` (CV).
   ⚠️ A3'teki aynı gerçek geçerli: Şirket 1'in ürün setleri pazarlar arası ayrık, bu yüzden
   karşılaştırma **pazar seviyesinde ortalama fiyat** üzerinden yapılır ve bu belirtilir.
 - Promosyon maliyeti: `bedava_kutu = brut_kutu × mf_oran_temiz`,

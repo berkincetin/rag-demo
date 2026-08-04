@@ -8,15 +8,15 @@
 ## Interfaces
 
 ```python
-TEST_AYLARI = 12          # walk-forward penceresi
+TEST_MONTHS = 12          # walk-forward penceresi
 
-def naive(gecmis: pd.Series) -> float          # y(t)
-def snaive(gecmis: pd.Series) -> float         # y(t-11)
-def ma3(gecmis: pd.Series) -> float            # son 3 ayın ortalaması
-def walk_forward(df, tahminci, ay_sayisi=TEST_AYLARI) -> pd.DataFrame
+def naive(history: pd.Series) -> float          # y(t)
+def snaive(history: pd.Series) -> float         # y(t-11)
+def ma3(history: pd.Series) -> float            # son 3 ayın ortalaması
+def walk_forward(df, forecaster, months=TEST_MONTHS) -> pd.DataFrame
     # → pazar, sirket, urun, tarih, gercek, tahmin
-def hata_metrikleri(gercek, tahmin) -> dict    # mae, rmse, mape, wape, smape
-def pazar_bazinda_metrikler(sonuc: pd.DataFrame) -> pd.DataFrame
+def error_metrics(gercek, tahmin) -> dict    # mae, rmse, mape, wape, smape
+def metrics_by_market(result: pd.DataFrame) -> pd.DataFrame
 ```
 
 ---

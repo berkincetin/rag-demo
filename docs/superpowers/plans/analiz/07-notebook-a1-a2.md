@@ -14,8 +14,8 @@ notebook'ta çağrı + grafik + yorum. Her görevin altında **iki ayrı başlı
 
 - [ ] **Adım 1: Notebook iskeleti ve veri kalitesi raporu**
 
-Hücreler: başlık → kurulum/import → `yukle_ham()` → `temizle()` → rapor tablosu.
-Rapor tablosu `VeriKalitesiRaporu`'ndan gelir; **hangi kayıt kaç kez düzeltildi**
+Hücreler: başlık → kurulum/import → `load_raw()` → `clean()` → rapor tablosu.
+Rapor tablosu `DataQualityReport`'ndan gelir; **hangi kayıt kaç kez düzeltildi**
 şeffaf yazılır. Kısa seriler ayrı tabloda listelenir (gizlenmez — PRD §4).
 
 - [ ] **Adım 2: A1 — son 2 yıl satış performansı**

@@ -3,51 +3,51 @@ import pandas as pd
 import pytest
 
 from src.analysis.metrics import (
-    fiyat_sapmasi,
+    derived_metrics,
     hhi,
-    mevsimsel_indeks,
-    mevsimsellik_gucu,
-    pazar_payi,
-    promosyon_gelir_kaybi,
-    turetilmis_metrikler,
-    yillik_buyume,
+    market_share,
+    price_dispersion,
+    promo_revenue_loss,
+    seasonal_index,
+    seasonality_strength,
+    yoy_growth,
 )
 
 
-def _cerceve(satirlar: list[dict]) -> pd.DataFrame:
+def _frame(satirlar: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(satirlar)
 
 
-def test_net_kutu_formulu():
+def test_the_net_units_formula():
     # Case tanımı: Net Kutu = Brüt Kutu × (1 − MF Oran).
-    df = _cerceve([{"brut_kutu": 100.0, "mf_oran_temiz": 0.2, "net_tl": 800.0}])
+    df = _frame([{"brut_kutu": 100.0, "mf_oran_temiz": 0.2, "net_tl": 800.0}])
 
-    sonuc = turetilmis_metrikler(df)
+    result = derived_metrics(df)
 
-    assert sonuc["net_kutu"].iloc[0] == pytest.approx(80.0)
-    assert sonuc["birim_fiyat"].iloc[0] == pytest.approx(10.0)
+    assert result["net_kutu"].iloc[0] == pytest.approx(80.0)
+    assert result["birim_fiyat"].iloc[0] == pytest.approx(10.0)
 
 
-def test_mf_bir_oldugunda_birim_fiyat_nan():
+def test_unit_price_is_nan_when_mf_is_one():
     # 🚨 V8: Net Kutu 0 → sıfıra bölme. Sonuç `inf` değil `NaN` olmalı.
-    df = _cerceve([{"brut_kutu": 100.0, "mf_oran_temiz": 1.0, "net_tl": 800.0}])
+    df = _frame([{"brut_kutu": 100.0, "mf_oran_temiz": 1.0, "net_tl": 800.0}])
 
-    sonuc = turetilmis_metrikler(df)
+    result = derived_metrics(df)
 
-    assert np.isnan(sonuc["birim_fiyat"].iloc[0])
-    assert not np.isinf(sonuc["birim_fiyat"].iloc[0])
-
-
-def test_negatif_net_kutu_birim_fiyati_nan_yapar():
-    df = _cerceve([{"brut_kutu": -50.0, "mf_oran_temiz": 0.1, "net_tl": 800.0}])
-
-    sonuc = turetilmis_metrikler(df)
-
-    assert np.isnan(sonuc["birim_fiyat"].iloc[0])
+    assert np.isnan(result["birim_fiyat"].iloc[0])
+    assert not np.isinf(result["birim_fiyat"].iloc[0])
 
 
-def test_pazar_paylari_her_ay_yuze_toplaniyor():
-    df = _cerceve(
+def test_negative_net_units_make_the_unit_price_nan():
+    df = _frame([{"brut_kutu": -50.0, "mf_oran_temiz": 0.1, "net_tl": 800.0}])
+
+    result = derived_metrics(df)
+
+    assert np.isnan(result["birim_fiyat"].iloc[0])
+
+
+def test_market_shares_sum_to_a_hundred_each_month():
+    df = _frame(
         [
             {"pazar": "A", "sirket": "Şirket 1", "tarih": "2020-01-01", "brut_kutu": 20.0},
             {"pazar": "A", "sirket": "Şirket 2", "tarih": "2020-01-01", "brut_kutu": 30.0},
@@ -58,7 +58,7 @@ def test_pazar_paylari_her_ay_yuze_toplaniyor():
     )
     df["tarih"] = pd.to_datetime(df["tarih"])
 
-    paylar = pazar_payi(df)
+    paylar = market_share(df)
 
     toplamlar = paylar.groupby(["pazar", "tarih"], observed=True)["pay"].sum()
     assert toplamlar.round(9).eq(100.0).all()
@@ -66,15 +66,15 @@ def test_pazar_paylari_her_ay_yuze_toplaniyor():
     assert ocak_s1["pay"].iloc[0] == pytest.approx(20.0)
 
 
-def test_hhi_tek_oyunculu_pazarda_on_bin():
-    df = _cerceve([{"pazar": "A", "sirket": "Şirket 1", "tarih": "2020-01-01", "brut_kutu": 42.0}])
+def test_hhi_is_ten_thousand_in_a_single_player_market():
+    df = _frame([{"pazar": "A", "sirket": "Şirket 1", "tarih": "2020-01-01", "brut_kutu": 42.0}])
     df["tarih"] = pd.to_datetime(df["tarih"])
 
     assert hhi(df)["hhi"].iloc[0] == pytest.approx(10000.0)
 
 
-def test_yillik_buyume_bilinen_seride_dogru():
-    df = _cerceve(
+def test_yoy_growth_is_correct_on_a_known_series():
+    df = _frame(
         [
             {"pazar": "A", "sirket": "Şirket 1", "tarih": "2020-06-01", "brut_kutu": 100.0},
             {"pazar": "A", "sirket": "Şirket 1", "tarih": "2021-06-01", "brut_kutu": 150.0},
@@ -82,43 +82,43 @@ def test_yillik_buyume_bilinen_seride_dogru():
     )
     df["tarih"] = pd.to_datetime(df["tarih"])
 
-    buyume = yillik_buyume(df)
+    buyume = yoy_growth(df)
 
     assert buyume[buyume["yil"] == 2021]["buyume"].iloc[0] == pytest.approx(50.0)
 
 
-def test_mevsimsel_indeks_kisa_seride_none_doner():
+def test_seasonality_returns_none_for_a_short_series():
     # 🚨 V9: 24 aydan kısa seride mevsimsellik hesaplanamaz. `C/Ürün 1` kodu kırmasın.
-    seri = pd.Series(
+    series = pd.Series(
         range(12), index=pd.date_range("2020-01-01", periods=12, freq="MS"), dtype=float
     )
 
-    assert mevsimsel_indeks(seri) is None
-    assert mevsimsellik_gucu(seri) is None
+    assert seasonal_index(series) is None
+    assert seasonality_strength(series) is None
 
 
-def test_mevsimsel_indeks_bilinen_deseni_yakalar():
+def test_the_seasonal_index_finds_a_known_pattern():
     # Aralık ayları belirgin şekilde yüksek; indeks o ayı en yüksek göstermeli.
-    aylar = pd.date_range("2018-01-01", periods=48, freq="MS")
-    degerler = [100.0 + (60.0 if t.month == 12 else 0.0) for t in aylar]
-    seri = pd.Series(degerler, index=aylar)
+    months_ = pd.date_range("2018-01-01", periods=48, freq="MS")
+    values_ = [100.0 + (60.0 if t.month == 12 else 0.0) for t in months_]
+    series = pd.Series(values_, index=months_)
 
-    indeks = mevsimsel_indeks(seri)
+    indeks = seasonal_index(series)
 
     assert indeks.idxmax() == 12
     assert indeks.loc[12] > indeks.loc[6]
 
 
-def test_mevsimsellik_gucu_duz_seride_sifira_yakin():
-    aylar = pd.date_range("2018-01-01", periods=48, freq="MS")
-    seri = pd.Series(np.linspace(100.0, 200.0, 48), index=aylar)
+def test_seasonality_strength_is_near_zero_on_a_flat_series():
+    months_ = pd.date_range("2018-01-01", periods=48, freq="MS")
+    series = pd.Series(np.linspace(100.0, 200.0, 48), index=months_)
 
-    assert mevsimsellik_gucu(seri) < 0.4
+    assert seasonality_strength(series) < 0.4
 
 
-def test_promosyon_gelir_kaybi_bilinen_degeri_uretir():
+def test_promo_revenue_loss_matches_a_hand_computed_value():
     # bedava_kutu = 100 × 0,2 = 20; birim fiyat = 800 / 80 = 10 → kayıp 200 TL.
-    df = _cerceve(
+    df = _frame(
         [
             {
                 "pazar": "A",
@@ -133,30 +133,30 @@ def test_promosyon_gelir_kaybi_bilinen_degeri_uretir():
     )
     df["tarih"] = pd.to_datetime(df["tarih"])
 
-    kayip = promosyon_gelir_kaybi(turetilmis_metrikler(df))
+    loss = promo_revenue_loss(derived_metrics(df))
 
-    assert kayip["gelir_kaybi_tl"].iloc[0] == pytest.approx(200.0)
+    assert loss["gelir_kaybi_tl"].iloc[0] == pytest.approx(200.0)
 
 
-def test_fiyat_sapmasi_ayni_fiyatta_sifir():
-    df = _cerceve(
+def test_price_dispersion_is_zero_at_an_identical_price():
+    df = _frame(
         [
             {"pazar": "A", "urun": "Ürün-X", "birim_fiyat": 10.0},
             {"pazar": "B", "urun": "Ürün-X", "birim_fiyat": 10.0},
         ]
     )
 
-    assert fiyat_sapmasi(df)["cv"].iloc[0] == pytest.approx(0.0)
+    assert price_dispersion(df)["cv"].iloc[0] == pytest.approx(0.0)
 
 
-def test_mevsimsellik_satis_gormeyen_aylari_gecmis_saymiyor():
+def test_seasonality_does_not_count_months_without_sales_as_history():
     # 🚨 `C Pazarı/Ürün 1` kırpma sonrası 28 satır taşıyor ama yalnız BİR ayında
     # satış var. Satır sayısına bakan bir eşik bunu "yeterli geçmiş" sayıyor ve STL
     # tek sıçramayı mevsimsellik diye raporluyordu: güç 0,987, zirve indeksi 8,72.
     # Uydurulmuş mevsimsellik, eksik veriden daha kötüdür.
-    aylar = pd.date_range("2024-01-01", periods=28, freq="MS")
-    degerler = [1.0] + [0.0] * 27
-    seri = pd.Series(degerler, index=aylar)
+    months_ = pd.date_range("2024-01-01", periods=28, freq="MS")
+    values_ = [1.0] + [0.0] * 27
+    series = pd.Series(values_, index=months_)
 
-    assert mevsimsel_indeks(seri) is None
-    assert mevsimsellik_gucu(seri) is None
+    assert seasonal_index(series) is None
+    assert seasonality_strength(series) is None

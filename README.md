@@ -454,7 +454,7 @@ negatif sonuç veriyor:
 Karşılaştırma: A Pazarı/Ürün-A aynı dönemde 10,28 TL. Düzeltme yapılmadan **A4, A6 ve
 A7 görevlerinin tamamı yanlış sonuç verir**. Kural sabit "B Pazarı" kontrolüyle değil,
 **grup medyanı > 1 ⇒ yüzde ölçekli** program tespitiyle uygulanıyor; veri değişirse
-kırılmaz. Testle korunuyor: `test_mf_olcek_tespiti_yalnizca_b_pazarini_yuzde_kabul_eder`.
+kırılmaz. Testle korunuyor: `test_only_market_b_is_detected_as_percent_scaled`.
 
 ### Bilinen sınırlılıklar (Bölüm 2)
 

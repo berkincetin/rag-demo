@@ -16,7 +16,7 @@
 
 These apply to **every** task. Each task's requirements implicitly include this section.
 
-- **Code language: Turkish** — identifiers, comments, docstrings and DataFrame column names (`brut_kutu`, `mf_oran`, `net_tl`, `pazar`, `sirket`, `urun`). This is the opposite of Part 1 and it is deliberate: the domain terms come from the dataset, and keeping them Turkish preserves traceability to the source. See CLAUDE.md §6. **Commit messages stay English.**
+- **Identifiers: English** — functions, variables, classes, constants, test names. **Comments, docstrings and notebook markdown: Turkish.** **DataFrame column names: Turkish** (`pazar`, `sirket`, `urun`, `tarih`, `brut_kutu`, `mf_oran`, `net_tl`, `gercek`, `tahmin`) — these mirror the workbook's own headers and are a data contract, not identifiers; never rename them. See CLAUDE.md §6. Commit messages stay English.
 - **Python 3.10.** `str | None` unions are fine; no 3.11+ features.
 - **All file I/O is UTF-8.** The Windows console is cp1252 — entry points call `sys.stdout.reconfigure(encoding="utf-8")`.
 - **Never hardcode "B Pazarı"** for the MF scale fix. Detect it programmatically (group median > 1 ⇒ percent scale). The rule must survive a data change.
@@ -54,12 +54,12 @@ Work in order. Each task ends with its own commit and is independently testable.
 
 | # | Task | File | Produces |
 |---|---|---|---|
-| 1 | Skeleton, dependencies, wide → tidy loader | [01-iskelet-yukleme.md](01-iskelet-yukleme.md) | `requirements-analysis.txt`, `src/analysis/load.py` → `yukle_ham` |
-| 2 | Cleaning pipeline and data quality report 🚨 | [02-temizleme.md](02-temizleme.md) | `clean.py` → `mf_olcek_tespit`, `temizle`, `VeriKalitesiRaporu` |
+| 1 | Skeleton, dependencies, wide → tidy loader | [01-iskelet-yukleme.md](01-iskelet-yukleme.md) | `requirements-analysis.txt`, `src/analysis/load.py` → `load_raw` |
+| 2 | Cleaning pipeline and data quality report 🚨 | [02-temizleme.md](02-temizleme.md) | `clean.py` → `detect_mf_scale`, `clean`, `DataQualityReport` |
 | 3 | Derived and analytical metrics | [03-metrikler.md](03-metrikler.md) | `metrics.py` → net kutu, birim fiyat, pazar payı, HHI, YoY, STL seasonality |
 | 4 | Chart style module | [04-grafikler.md](04-grafikler.md) | `plots.py` → Turkish formatting, fixed palettes, `figures/` writer |
 | 5 | Baseline forecasts and walk-forward harness | [05-tahmin-temel.md](05-tahmin-temel.md) | `forecast.py` → `naive`, `snaive`, `ma3`, `walk_forward`, MAE/MAPE/RMSE/WAPE/sMAPE |
-| 6 | Global LightGBM and the MF ablation | [06-tahmin-lgbm.md](06-tahmin-lgbm.md) | `ozellik_matrisi`, `lgbm`, `lgbm_no_mf` |
+| 6 | Global LightGBM and the MF ablation | [06-tahmin-lgbm.md](06-tahmin-lgbm.md) | `feature_matrix`, `lgbm`, `lgbm_no_mf` |
 | 7 | Notebook: quality report + A1, A2 | [07-notebook-a1-a2.md](07-notebook-a1-a2.md) | `notebooks/analiz.ipynb` opening + two tasks |
 | 8 | Notebook: A3, A4 | [08-notebook-a3-a4.md](08-notebook-a3-a4.md) | Seasonality heat map, MF event study with p-values |
 | 9 | Notebook: A5, A6 | [09-notebook-a5-a6.md](09-notebook-a5-a6.md) | Competitor growth, unit price and promotion cost |

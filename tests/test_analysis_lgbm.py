@@ -2,100 +2,100 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.analysis.forecast import MF_OZELLIKLERI, lgbm_walk_forward, ozellik_matrisi
+from src.analysis.forecast import MF_FEATURES, feature_matrix, lgbm_walk_forward
 
 
-def _seri(pazar, urun, aylar=40, baslangic=100.0):
-    tarih = pd.date_range("2020-01-01", periods=aylar, freq="MS")
+def _series(pazar, urun, months_=40, start=100.0):
+    tarih = pd.date_range("2020-01-01", periods=months_, freq="MS")
     return pd.DataFrame(
         {
             "pazar": pazar,
             "sirket": "Şirket 1",
             "urun": urun,
             "tarih": tarih,
-            "brut_kutu": [baslangic + i + 10 * (t.month == 12) for i, t in enumerate(tarih)],
-            "mf_oran_temiz": np.linspace(0.05, 0.25, aylar),
+            "brut_kutu": [start + i + 10 * (t.month == 12) for i, t in enumerate(tarih)],
+            "mf_oran_temiz": np.linspace(0.05, 0.25, months_),
         }
     )
 
 
-def test_ozellik_matrisi_lag_yonu_dogru():
+def test_the_lag_features_point_backwards_in_time():
     # 🚨 lag_1 gerçekten bir önceki ay olmalı; ters kaydırma sızıntıdır.
-    df = _seri("A Pazarı", "Ürün-A", aylar=6, baslangic=100.0)
+    df = _series("A Pazarı", "Ürün-A", months_=6, start=100.0)
 
-    matris = ozellik_matrisi(df).sort_values("tarih").reset_index(drop=True)
+    matrix = feature_matrix(df).sort_values("tarih").reset_index(drop=True)
 
-    assert np.isnan(matris.loc[0, "lag_1"])
-    assert matris.loc[1, "lag_1"] == pytest.approx(matris.loc[0, "brut_kutu"])
-    assert matris.loc[2, "lag_2"] == pytest.approx(matris.loc[0, "brut_kutu"])
+    assert np.isnan(matrix.loc[0, "lag_1"])
+    assert matrix.loc[1, "lag_1"] == pytest.approx(matrix.loc[0, "brut_kutu"])
+    assert matrix.loc[2, "lag_2"] == pytest.approx(matrix.loc[0, "brut_kutu"])
 
 
-def test_ozellik_matrisi_seri_sinirini_asmiyor():
+def test_lags_never_cross_a_series_boundary():
     # 🚨 V6: bir serinin lag_1'i başka bir serinin son ayı olamaz.
-    a = _seri("A Pazarı", "Ürün-A", aylar=4, baslangic=100.0)
-    b = _seri("D Pazarı", "Ürün 77", aylar=4, baslangic=9000.0)
+    a = _series("A Pazarı", "Ürün-A", months_=4, start=100.0)
+    b = _series("D Pazarı", "Ürün 77", months_=4, start=9000.0)
 
-    matris = ozellik_matrisi(pd.concat([a, b]))
-    ilk_b = matris[(matris["urun"] == "Ürün 77")].sort_values("tarih").iloc[0]
+    matrix = feature_matrix(pd.concat([a, b]))
+    first_b = matrix[(matrix["urun"] == "Ürün 77")].sort_values("tarih").iloc[0]
 
-    assert np.isnan(ilk_b["lag_1"])
-
-
-def test_mf_ablasyonunda_mf_kolonlari_yok():
-    df = _seri("A Pazarı", "Ürün-A", aylar=8)
-
-    matris = ozellik_matrisi(df, mf_dahil=False)
-
-    assert not set(MF_OZELLIKLERI) & set(matris.columns)
+    assert np.isnan(first_b["lag_1"])
 
 
-def test_mf_dahilken_mf_kolonlari_var():
-    df = _seri("A Pazarı", "Ürün-A", aylar=8)
+def test_the_ablation_drops_every_mf_feature():
+    df = _series("A Pazarı", "Ürün-A", months_=8)
 
-    matris = ozellik_matrisi(df, mf_dahil=True)
+    matrix = feature_matrix(df, with_mf=False)
 
-    assert set(MF_OZELLIKLERI) <= set(matris.columns)
+    assert not set(MF_FEATURES) & set(matrix.columns)
 
 
-def test_lgbm_tahminleri_negatif_degil():
+def test_mf_features_are_present_when_requested():
+    df = _series("A Pazarı", "Ürün-A", months_=8)
+
+    matrix = feature_matrix(df, with_mf=True)
+
+    assert set(MF_FEATURES) <= set(matrix.columns)
+
+
+def test_lgbm_predictions_are_never_negative():
     # Hedef log1p ile dönüştürülüyor; geri çevirmede negatif çıkmamalı.
-    df = pd.concat([_seri("A Pazarı", "Ürün-A"), _seri("B Pazarı", "Ürün-FR", baslangic=50.0)])
+    df = pd.concat([_series("A Pazarı", "Ürün-A"), _series("B Pazarı", "Ürün-FR", start=50.0)])
 
-    sonuc = lgbm_walk_forward(df, ay_sayisi=2)
+    result = lgbm_walk_forward(df, months=2)
 
-    assert len(sonuc) > 0
-    assert (sonuc["tahmin"] >= 0).all()
+    assert len(result) > 0
+    assert (result["tahmin"] >= 0).all()
 
 
-def test_lgbm_ablasyonu_ayni_katmanlarda_karsilastiriyor():
+def test_the_ablation_compares_the_same_folds():
     # İki model aynı hedef aylarda değerlendirilmezse delta anlamsız olur.
-    df = pd.concat([_seri("A Pazarı", "Ürün-A"), _seri("B Pazarı", "Ürün-FR", baslangic=50.0)])
+    df = pd.concat([_series("A Pazarı", "Ürün-A"), _series("B Pazarı", "Ürün-FR", start=50.0)])
 
-    mf_ile = lgbm_walk_forward(df, mf_dahil=True, ay_sayisi=2)
-    mf_siz = lgbm_walk_forward(df, mf_dahil=False, ay_sayisi=2)
+    mf_ile = lgbm_walk_forward(df, with_mf=True, months=2)
+    mf_siz = lgbm_walk_forward(df, with_mf=False, months=2)
 
     anahtar = ["pazar", "urun", "tarih"]
     assert mf_ile[anahtar].reset_index(drop=True).equals(mf_siz[anahtar].reset_index(drop=True))
 
 
-def test_lgbm_kisa_seriyi_hedef_yapmiyor_ama_egitimde_tutuyor():
-    kisa = _seri("C Pazarı", "Ürün 1", aylar=3, baslangic=5.0)
-    uzun = _seri("A Pazarı", "Ürün-A")
+def test_short_series_train_the_model_but_are_never_targets():
+    short = _series("C Pazarı", "Ürün 1", months_=3, start=5.0)
+    long_ = _series("A Pazarı", "Ürün-A")
 
-    sonuc = lgbm_walk_forward(pd.concat([kisa, uzun]), ay_sayisi=2)
+    result = lgbm_walk_forward(pd.concat([short, long_]), months=2)
 
-    assert set(sonuc["urun"]) == {"Ürün-A"}
+    assert set(result["urun"]) == {"Ürün-A"}
 
 
-def test_hedef_secimi_indeks_etiketine_guvenmiyor():
+def test_target_selection_does_not_rely_on_index_labels():
     # Çağıran taraf indeksi sıfırlamamış olabilir. Aynı etiketi taşıyan ve aynı aya
-    # düşen kısa bir seri, uzun serinin hedef satırıyla karışmamalı.
-    uzun = _seri("A Pazarı", "Ürün-A", aylar=40)
-    kisa = _seri("C Pazarı", "Ürün 1", aylar=3, baslangic=5.0)
-    kisa["tarih"] = uzun["tarih"].to_numpy()[-3:]
-    kisa.index = uzun.index[-3:]
+    # düşen kısa bir series, long_ serinin hedef satırıyla karışmamalı.
+    long_ = _series("A Pazarı", "Ürün-A", months_=40)
+    short = _series("C Pazarı", "Ürün 1", months_=3, start=5.0)
+    short["tarih"] = long_["tarih"].to_numpy()[-3:]
+    short.index = long_.index[-3:]
 
-    sonuc = lgbm_walk_forward(pd.concat([uzun, kisa]), ay_sayisi=2)
+    result = lgbm_walk_forward(pd.concat([long_, short]), months=2)
 
-    assert set(sonuc["urun"]) == {"Ürün-A"}
-    assert len(sonuc) == 2
+    assert set(result["urun"]) == {"Ürün-A"}
+    assert len(result) == 2

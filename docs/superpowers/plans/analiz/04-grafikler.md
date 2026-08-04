@@ -8,13 +8,13 @@
 ## Interfaces
 
 ```python
-PAZAR_RENKLERI: dict[str, str]     # A/B/C/D sabit palet
-SIRKET_RENKLERI: dict[str, str]    # Şirket 1 vurgulu, diğerleri nötr
-FIGUR_DIZINI = Path("figures")
+MARKET_COLORS: dict[str, str]     # A/B/C/D sabit palet
+COMPANY_COLORS: dict[str, str]    # Şirket 1 vurgulu, diğerleri nötr
+FIGURE_DIR = Path("figures")
 
-def stil_uygula() -> None                       # rcParams, TR sayı biçimi
-def tr_sayi(x: float, ondalik: int = 0) -> str  # 1234.5 → '1.234,5'
-def kaydet(fig, ad: str) -> Path                # figures/<ad>.png, 150 dpi
+def apply_style() -> None                       # rcParams, TR sayı biçimi
+def tr_number(x: float, decimals: int = 0) -> str  # 1234.5 → '1.234,5'
+def save_figure(fig, name: str) -> Path                # figures/<name>.png, 150 dpi
 ```
 
 ---

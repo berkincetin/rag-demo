@@ -42,6 +42,10 @@ class AzureOpenAIClient:
 
     def __init__(self, config: AzureConfig | None = None, client: Any = None) -> None:
         self.config = config or AzureConfig.load()
+        # `agent.py` reads `llm.model` to label metrics and price the run. Without
+        # this attribute it falls back to "bilinmiyor", so every recorded run and
+        # every cost lookup loses the model identity — measured, not assumed.
+        self.model = self.config.chat_deployment
         self._client = client or self._build_client()
 
     def _build_client(self) -> Any:

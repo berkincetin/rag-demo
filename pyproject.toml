@@ -7,8 +7,8 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 markers = ["integration: touches real project data files"]
-addopts = "--cov=src --cov-report=term-missing"
+addopts = "--cov=src --cov=azure --cov-report=term-missing"
 
 [tool.coverage.run]
-source = ["src"]
+source = ["src", "azure"]
 omit = ["src/rag/llm.py", "gradio_app.py", "src/rag/api.py"]

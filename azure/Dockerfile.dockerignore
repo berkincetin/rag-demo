@@ -1,0 +1,17 @@
+**/__pycache__
+**/*.pyc
+.git
+.venv
+.env
+azure/.env
+node_modules
+web/
+azure/web/
+notebooks
+figures
+docs
+tests
+azure/tests
+AI Engineer/
+storage/
+rag-demo.zip

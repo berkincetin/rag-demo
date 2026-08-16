@@ -10,6 +10,7 @@ from azure.rag.config import AzureConfig
 from azure.rag.embedder import AzureOpenAIEmbedder
 from azure.rag.index import load_index
 from azure.rag.llm_client import AzureOpenAIClient
+from azure.rag.metrics import MetricsStore
 from azure.rag.retriever import Retriever
 from azure.rag.tools import ToolBox
 
@@ -31,4 +32,5 @@ def build_agent(config: AzureConfig | None = None) -> Agent:
         ToolBox(retriever),
         AzureOpenAIClient(config),
         config.max_tool_turns,
+        metrics=MetricsStore(config.storage_dir / "metrics.db"),
     )

@@ -1,0 +1,5 @@
+{
+  "_kaynak": "Azure OpenAI fiyatlandirmasi bolgeye ve katmana gore degisir ve DOGRULANMADIGI icin null birakilmistir. Arayuz 'fiyat girilmedi' gosterir, token sayilari yine kaydedilir. Uydurma fiyat girmeyin.",
+  "_guncelleme": "2026-08-16",
+  "gpt-4.1-mini": {"input": null, "output": null}
+}

@@ -27,7 +27,7 @@ _CLOUD_MODELS = (
     ModelInfo("claude-sonnet-5", "anthropic", "Claude Sonnet 5", 1_000_000),
     ModelInfo("claude-haiku-4-5", "anthropic", "Claude Haiku 4.5", 200_000),
     ModelInfo("gpt-4o-mini", "openai", "GPT-4o mini", 128_000),
-    ModelInfo("gemini-2.0-flash", "gemini", "Gemini 2.0 Flash", 1_000_000),
+    ModelInfo("gemini-3.5-flash", "gemini", "Gemini 3.5 Flash", 1_000_000),
 )
 
 

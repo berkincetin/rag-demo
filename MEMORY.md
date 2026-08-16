@@ -463,6 +463,88 @@ Dört commit: `feat(providers)`, `feat(agent)` (LangGraph), `feat(ui)`, `feat(se
 
 ---
 
+### Streamlit → Gradio geçişi (2026-08-06)
+
+Kullanıcı isteğiyle arayüz **tamamen** Gradio'ya taşındı: `app.py` + `pages/*.py` (4 sayfa)
+silindi, yerine tek dosya `gradio_app.py` (5 sekme) geldi. Port `8501` → **`7860`**.
+
+| Bulgu | Ayrıntı |
+|---|---|
+| **`ui_state.py` hiç değişmeden taşındı** | Modül baştan `MutableMapping` alıyordu ve hiçbir arayüz kütüphanesi import etmiyordu. Streamlit'e bağımlı olsaydı bu geçiş kat kat pahalı olurdu — sınırın doğru yerde çizilmesinin somut getirisi |
+| 🚨 **`gradio==5.9.1` çalışmıyor: `gr.Chatbot(type="messages")` ile başlangıçta 500** | `gradio_client/utils.py` içindeki `_json_schema_to_python_type`, `additionalProperties`'e özyineliyor; JSON Schema bunun **bool** olmasına izin veriyor (`false`) ve ardından `get_type` `"const" in <bool>` yapıp `TypeError: argument of type 'bool' is not iterable` atıyor. `show_api=False` bu yolu **engellemiyor**. Bileşen bileşen izole edildi: yalnızca `Chatbot(type="messages")` patlıyor. Çözüm: **`gradio==5.50.0`** (client 1.14.0) — yukarı akışta düzelmiş. Sürüm seçerken bu tuzağa dikkat |
+| **`gr.Progress()` varsayılan argümanda B008 veriyor** | Gradio'nun belgelenmiş kullanımı bu, ama ruff `B008` ile şikâyet ediyor. Modül düzeyinde `_PROGRESS = gr.Progress()` singleton'ı yapıldı; Gradio yine her istekte kendi izleyicisini enjekte ediyor |
+| **Gradio 6.0 uyarıları** | `theme`, `css`, `show_api` parametreleri `Blocks()`/`launch()` içinde 6.0'da kalkacak. Şu an yalnızca `DeprecationWarning`; 6.0'a geçilirse `launch()`'a taşınmalı |
+| **README "üç komut" tutarsızlığı giderildi** | Başlık üç diyordu, dört komut listeliyordu. `setup.py` isteğe bağlı dördüncü adım olarak ayrıldı; case "3 komutla baslamali" diyor |
+| 🚨 **Sohbet için `gr.ChatInterface` kullanılmalı — elle `Chatbot`+`Textbox`+`Button` kurma** | İlk iki tasarım denemesi kullanıcı tarafından reddedildi ("neyin nerede olduğu anlaşılmıyor"). Kök sebep: sohbet bloğu elle kuruluyordu, dolayısıyla girdi/gönder/örnekler/otomatik kaydırma/geçmiş yeniden icat ediliyor, çevredeki paneller de yer kalan yere konuyordu. `gr.ChatInterface` bunların hepsini hazır veriyor; kaynak/araç/metrik panelleri **`additional_outputs`** ile aynı çağrıdan güncelleniyor, ad alanı **`additional_inputs`** ile onun kendi akordiyonuna giriyor. Panelleri sohbetin **altına** koymak için bileşenleri `render=False` ile tanımlayıp sonra `.render()` çağır |
+| **`ChatInterface` iki API tuzağı** | (1) `additional_inputs` varsa `examples` **liste-listesi** olmalı: `[[soru, None, None], …]` — düz string listesi `ValueError` veriyor. (2) `fn` imzası `(mesaj, geçmiş, *additional_inputs)` ve **yalnız** cevap metni + `additional_outputs` döndürmeli; `history`'yi kendisi yönetiyor, elle yeniden kurulursa mesajlar ikilenir |
+
+---
+
+### Next.js arayüzü + FastAPI katmanı (2026-08-06)
+
+Kullanıcı Gradio tasarımını üç denemede de beğenmedi ve **Gradio'ya dokunmadan** ayrı bir
+Next.js arayüzü istedi. Sonuç: iki arayüz yan yana duruyor, ikisi de tam işlevli.
+
+| Bulgu | Ayrıntı |
+|---|---|
+| **`serialize.py` ayrıldı, `api.py` ince kaldı** | Wire contract (`answer_payload`, `run_payload`, …) sunucu başlatmadan test edilebiliyor — 9 test TDD ile yazıldı, önce kırmızı görüldü. `api.py` yalnız yönlendirme, kapsam dışı |
+| **`ui_state.py` yine değişmedi** | FastAPI de `MutableMapping` oturum sözlüğü veriyor. Aynı yardımcılar hem Gradio hem HTTP API'yi besliyor — sınırın doğru yerde olmasının ikinci getirisi |
+| 🚨 **`web/AGENTS.md` var: "This is NOT the Next.js you know"** | Next.js 16 kendi dokümanlarını `node_modules/next/dist/docs/` altına koyuyor ve kod yazmadan **önce** okunmasını istiyor. Ben kodu önce yazdım, sonra doğruladım. Kırıcı değişiklikler (async request API'leri, `middleware`→`proxy`, `next/image`) bu istemci-taraflı uygulamayı etkilemedi ama sıradaki Next.js işinde önce o dokümanlar okunmalı |
+| **React 19 `set-state-in-effect` kuralı** | `useEffect` içinde `setState` artık lint hatası. İki gerçek düzeltme yapıldı: türetilebilir state (`picked ?? activeId`) senkronlanmayacak, tema `useState` lazy initializer'ı ile okunacak. Kalan üç yer gerçek "mount'ta sunucudan veri çek" — `disable` yorumu **`useEffect`'in üstüne değil, içindeki çağrının üstüne** konmalı, yoksa kural yine patlıyor |
+| **Türkçe curl gövdesi Git Bash'te bozuluyor** | `curl -d '{"question":"Direktör…"}'` → `400 "error parsing the body"`. API hatası değil, kabuk UTF-8'i bozuyor. Gerçek testi Python `urllib` ile yapmak gerekti |
+
+### Docker: 6 servis + "üç komut" kuralı (2026-08-07)
+
+Next.js arayüzü Docker'a eklendi ve case'in "3 komutla baslamali" şartı **her üç yolda da**
+sağlandı.
+
+| Bulgu | Ayrıntı |
+|---|---|
+| **`api` ve `rag` aynı imajı paylaşıyor** | İkisi de 7,4 GB'lık Python imajını kullanıyor, yalnızca `command` farklı (`uvicorn …` / `python gradio_app.py`). Ayrı imaj derlemek boyutu iki katına çıkarırdı |
+| **`ingest` ayrı bir servis oldu** | Eskiden `CMD` içinde `[ -f chunks.jsonl ] \|\| ingest.py` vardı. Üç servis aynı anda kalkınca üçü birden ingest çalıştırıp aynı `storage/` dizinine yazardı. Artık `ingest` bir kez çalışıp çıkıyor; `api` ve `rag` `service_completed_successfully` ile bekliyor |
+| 🚨 **`web/.dockerignore` şart** | Yoksa `node_modules` + `.next` derleme bağlamına giriyor: **287 MB** aktarım ölçüldü ve Dockerfile zaten hepsini atıyor. Eklendikten sonra bağlam birkaç yüz KB'a düştü. Kök `.dockerignore`'a da `web/node_modules/` eklendi (Python imajına sızmasın) |
+| **`NEXT_PUBLIC_API_URL` derleme zamanında gömülüyor** | Tarayıcıda çalışan kod API'yi **host'tan** çağırır, konteyner adı (`http://api:8000`) tarayıcıda çözümlenmez. Bu yüzden compose'da `build.args` olarak `http://localhost:8000` veriliyor, `environment` olarak değil |
+| **CORS artık ortam değişkeni** | `CORS_ORIGINS` (varsayılan `localhost:3000,127.0.0.1:3000`). Sabit kodlanmış olsaydı farklı bir host/port ile sunulduğunda kırılırdı |
+| **`scripts/run_web.py` "üç komut" için yazıldı** | Next.js yolu Docker'sız 5 komut olurdu (`pip`, `ingest`, `npm install`, `uvicorn`, `npm dev`). Betik son üçünü tek komuta indiriyor, gerekirse `npm install` çalıştırıyor, Ctrl+C ikisini birden durduruyor. TDD ile yazıldı (6 test) |
+| **`output: "standalone"`** | `next.config.ts`'e eklendi; Next.js 16 dokümanlarından doğrulandı. Runner imajı tam `node_modules` yerine yalnız çalışma zamanı dosyalarını taşıyor |
+
+---
+
+### Teslim paketi yeniden üretildi (2026-08-07)
+
+README üç katmanı (Next.js + FastAPI + Gradio) anlatacak şekilde genişletildi ve
+`rag-demo.zip` sıfırdan kuruldu: **88 → 188 dosya**, 0,7 MB → 3,5 MB.
+
+| Bulgu | Ayrıntı |
+|---|---|
+| 🚨 **`git archive` bu projede ZIP üretemez** | Eski paket böyle üretilmişti ve bayatlamasının sebebi buydu: `web/`, `gradio_app.py`, `api.py`, `serialize.py` ve 3 test dosyası hâlâ **untracked**. `git archive` onları sessizce atlar. Üstelik `data/` ve `AI Engineer/` bilerek gitignore'da ama teslimde **bulunmak zorunda**. Paket artık çalışma ağacından, açık dışlama listesiyle kuruluyor |
+| **Dışlananlar** | `node_modules` (`run_web.py`/Docker yeniden kurar), `.next`, `storage/`, `figures/`, `__pycache__`, `.venv`, `.git`, `.claude`, `.env` (yalnız `.env.example` gidiyor), `CLAUDE.md` + `web/CLAUDE.md` + `web/AGENTS.md` (ajan araçları, teslim değil) |
+| **Doğrulama yöntemi** | ZIP temiz bir dizine açılıp testler **oradan** çalıştırıldı: 289 birim + 31 entegrasyon geçti. Entegrasyon testlerinin geçmesi `data/`nın gerçekten pakette olduğunu kanıtlıyor — dosya listesine bakmak bunu kanıtlamaz |
+| **`api.py` kapsam dışına alındı** | README "kapsam dışı" diyordu ama `pyproject.toml`'da yoktu; %0 görünüp toplamı %87'ye çekiyordu. Eklendikten sonra **%95**. Gerekçe `gradio_app.py` ile aynı: içinde test edilecek karar yok |
+| 🚨 **`env_file: .env` teslimde `docker compose up`'ı kırıyordu** | `.env` sır dosyası olduğu için pakete girmiyor, ama compose onu **zorunlu** sayıyordu: açılan ZIP'te `docker compose config` bile `env file not found` ile patlıyordu — yani README'nin "tek komut" vaadi teslim paketinde çalışmıyordu. Çözüm `env_file: [{path: .env, required: false}]`. Bu ancak paketi açıp **içinden** çalıştırınca görüldü; repo kökünde `.env` durduğu için hep yeşil görünüyordu |
+
+---
+
+### Bölüm 2 teslim paketi: tek dosyalık notebook (2026-08-07)
+
+Kullanıcı Bölüm 2 için ayrı bir teslim istedi: `src/analysis/` fonksiyonları notebook'un
+**içine** alınmış, `pip install` hücresiyle başlayan tek dosya (`analiz_full.ipynb`) +
+onun ürettiği görseller. Mevcut kodlara dokunulmadı.
+
+| Bulgu | Ayrıntı |
+|---|---|
+| **Notebook elle değil betikle üretildi** | `analiz.ipynb`'nin 48 analiz hücresi **birebir** kopyalandı; yalnız iki bootstrap hücresi (`sys.path` + `src.analysis` import'ları) pip/veri-yolu/fonksiyon hücreleriyle değiştirildi. Elle kopyalamak analizi kaynaktan ayrıştırırdı |
+| 🚨 **Kopyalanan kod aynı sonucu veriyor mu — varsayılmadı, ölçüldü** | Notebook'un tanım hücreleri ayrı bir isim alanında çalıştırılıp modüllerle **yan yana** koşturuldu: `load_raw`, `clean` (+7 rapor alanı), `derived_metrics`, `market_share`, `hhi`, `yoy_growth`, `promo_revenue_loss`, STL fonksiyonları ve üç temel model + **LightGBM'in iki varyantı** `assert_frame_equal` ile karşılaştırıldı. Hepsi birebir |
+| **`nbformat` kaynak satırları** | `text.split("
+")` satır sonlarını düşürüyor ve bütün hücre tek satıra yapışıp `SyntaxError` veriyor. Doğrusu `splitlines(keepends=True)` — son satır hariç her satır `
+` taşır |
+| **Kopyalanan hücrelerin `id`'si çakışır** | nbformat 4.5+ benzersiz `id` istiyor; kaynaktan alınan hücreler kendi id'lerini taşıdığı için konuma göre yeniden atandı. Ayrıca `execution_count`/`outputs` temizlendi ki paket "çalıştırılmamış" halde başlasın |
+| **Doğrulama izole dizinde yapıldı** | Notebook `src/` erişilemeyen bir klasöre kopyalanıp `nbconvert --execute` ile koşturuldu — "bağımsız çalışıyor" iddiası ancak böyle kanıtlanır. 0 hata, 10 grafik. Sonra ZIP açılıp **oradan** tekrar koşturuldu: promosyon 108,3 milyon TL, %2,93, A4 1783/89/1694 ve A7 kazananları (snaive/ma3/ma3/lgbm) `analiz.ipynb` ile aynı |
+| **Teslim edilen notebook çalıştırılmış olan** | ZIP'e çıktıları ve grafikleri gömülü sürüm konuldu; değerlendirici çalıştırmadan da sonuçları görüyor. `figures/` ayrıca PNG olarak da var |
+
+---
+
 ## 5. Açık Sorular / Bekleyen Kararlar
 
-_(Şu an yok. Bir karar kullanıcıya sorulacaksa buraya yaz, cevap gelince §1'e taşı.)_
+- **`gemini-3.5-flash` model ID'si doğrulanmadı.** Kullanıcı verdi, katalogda öyle yazıldı;
+  Google'ın resmi ID listesiyle teyit edilmedi. Yanlışsa `404` döner.

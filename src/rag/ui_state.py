@@ -1,8 +1,9 @@
-"""Logic behind the Streamlit pages.
+"""Logic behind the Gradio front-end.
 
-Streamlit page files are excluded from coverage, so everything that can be
-reasoned about lives here instead and is tested with a plain dict standing in
-for `st.session_state`. This module imports no Streamlit.
+`gradio_app.py` is layout and wiring only and is excluded from coverage, so
+everything that can be reasoned about lives here instead and is tested with a
+plain dict standing in for the session. This module imports no UI framework —
+the session is any `MutableMapping`.
 """
 
 from collections.abc import MutableMapping
@@ -243,6 +244,46 @@ def format_gpu(vram_mb: int | None) -> str:
     if vram_mb == 0:
         return "CPU'da (GPU kullanılmıyor)"
     return f"{_tr(vram_mb / 1024, 1)} GB VRAM"
+
+
+def citation_markdown(answer) -> str:
+    """The numbered source list shown under an answer.
+
+    An answer with no citations is a refusal or a "bilmiyorum"; say so rather
+    than rendering an empty block, which reads as a broken panel.
+    """
+    if not answer.citations:
+        return "_Bu cevap için kaynak gösterilmedi._"
+    return "\n".join(
+        f"**{position}.** {label}" for position, label in enumerate(answer.citations, start=1)
+    )
+
+
+def tool_trace_rows(answer) -> list[list]:
+    """Tool calls as table rows, keeping the automatic ones distinguishable.
+
+    `injected` marks a search the agent ran on the model's behalf after the
+    model answered without consulting anything. Collapsing it into a plain call
+    would overstate how often the model chose its own tools.
+    """
+    return [
+        [
+            call["name"],
+            str(call.get("arguments", {})),
+            call.get("chars", 0),
+            "otomatik" if call.get("injected") else "model",
+        ]
+        for call in answer.tool_trace
+    ]
+
+
+def metrics_line(answer, cost_usd: float | None) -> str:
+    """One line of per-answer measurements, labelling anything unmeasured."""
+    if answer.usage.input_tokens is None:
+        tokens = "token ölçülmedi"
+    else:
+        tokens = f"↑{answer.usage.input_tokens} / ↓{answer.usage.output_tokens} token"
+    return f"⏱ {format_latency(answer.latency_ms)}  ·  🔤 {tokens}  ·  💵 {format_cost(cost_usd)}"
 
 
 def estimate_eval_cost(model_id: str, cases: int) -> float | None:

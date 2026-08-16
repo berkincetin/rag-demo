@@ -27,6 +27,10 @@ htmlcov/
 # Teslim paketi
 rag-demo.zip
 
+# Next.js arayüzü kendi imajında derlenir; node_modules Python imajına girmemeli
+web/node_modules/
+web/.next/
+
 # Planlama dokümanları çalışma zamanında gerekmez
 docs/
 

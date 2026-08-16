@@ -180,8 +180,29 @@ class OpenAIClient:
         )
 
 
+def to_gemini_schema(schema: Any) -> Any:
+    """Rewrite a JSON Schema's `type` values into the spelling Gemini demands.
+
+    `TOOL_SCHEMAS` is written in JSON Schema, whose types are lowercase
+    ("object", "string"). Anthropic and OpenAI accept that as-is, but Gemini's
+    `FunctionDeclaration` is a pydantic model whose `type` is an enum of
+    uppercase names — the lowercase spelling fails validation on every call.
+    Only `type` is touched; descriptions and `required` pass through unchanged.
+    """
+    if isinstance(schema, dict):
+        return {
+            key: value.upper()
+            if key == "type" and isinstance(value, str)
+            else to_gemini_schema(value)
+            for key, value in schema.items()
+        }
+    if isinstance(schema, list):
+        return [to_gemini_schema(item) for item in schema]
+    return schema
+
+
 class GeminiClient:
-    def __init__(self, model: str = "gemini-2.0-flash", api_key: str | None = None) -> None:
+    def __init__(self, model: str = "gemini-3.5-flash", api_key: str | None = None) -> None:
         from google import genai
 
         self.model = model
@@ -211,7 +232,7 @@ class GeminiClient:
                         types.FunctionDeclaration(
                             name=schema["name"],
                             description=schema["description"],
-                            parameters=schema["parameters"],
+                            parameters=to_gemini_schema(schema["parameters"]),
                         )
                         for schema in tools
                     ]

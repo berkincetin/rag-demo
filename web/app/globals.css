@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+/*
+ * One token set, two themes. Light is the default; `.dark` on <html> flips it.
+ * Components only ever reference these variables, so nothing needs a
+ * `dark:` variant and both themes stay in sync by construction.
+ */
+:root {
+  --bg: #f7f7f8;
+  --surface: #ffffff;
+  --surface-2: #f2f2f4;
+  --border: #e3e3e7;
+  --text: #17171a;
+  --text-dim: #6b6b76;
+  --accent: #4f46e5;
+  --accent-fg: #ffffff;
+  --accent-soft: #eef2ff;
+  --ok: #0f7b4f;
+  --ok-soft: #e6f5ee;
+  --warn: #9a5b00;
+  --warn-soft: #fdf3e3;
+  --danger: #b4232c;
+  --danger-soft: #fdeced;
+  --shadow: 0 1px 2px rgba(16, 16, 20, 0.06), 0 4px 16px rgba(16, 16, 20, 0.05);
+}
+
+.dark {
+  --bg: #0b0b0e;
+  --surface: #141419;
+  --surface-2: #1c1c23;
+  --border: #2a2a33;
+  --text: #ececf1;
+  --text-dim: #9a9aa8;
+  --accent: #8b85ff;
+  --accent-fg: #12121a;
+  --accent-soft: #1e1b3a;
+  --ok: #4ade80;
+  --ok-soft: #12241c;
+  --warn: #fbbf24;
+  --warn-soft: #2a2010;
+  --danger: #f87171;
+  --danger-soft: #2a1416;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-dim: var(--text-dim);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Slim scrollbars — a full-width native bar inside the transcript column
+   visually competes with the message list. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-rise {
+  animation: rise 0.22s ease-out;
+}
+
+@keyframes pulse-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.dot {
+  animation: pulse-dot 1.3s infinite ease-in-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .dot {
+    animation: none;
+  }
+}

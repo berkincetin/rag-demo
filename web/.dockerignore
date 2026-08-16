@@ -1,0 +1,19 @@
+# Bağımlılıklar imaj içinde `npm ci` ile kurulur; host'takini göndermek
+# derleme bağlamını yüzlerce MB şişiriyor (ve Windows/Linux ikilileri
+# zaten uyumsuz).
+node_modules
+.next
+out
+
+# Derleme çıktısı ve yerel artıklar
+.turbo
+*.tsbuildinfo
+next-env.d.ts
+
+# Ortam dosyaları: API adresi derleme argümanı olarak geçiliyor
+.env*.local
+
+# Araç yapılandırmaları çalışma zamanında gerekmez
+.git
+.gitignore
+README.md

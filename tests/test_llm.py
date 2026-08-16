@@ -166,6 +166,44 @@ def test_ollama_temperature_is_configurable(monkeypatch):
     assert OllamaClient(model="m").temperature == 0.7
 
 
+def test_gemini_schema_types_are_uppercased():
+    # Gemini's FunctionDeclaration is a pydantic model whose `type` field is an
+    # enum accepting only "STRING"/"OBJECT"/... . TOOL_SCHEMAS carries JSON
+    # Schema's lowercase spelling, which Anthropic and OpenAI take verbatim.
+    # Passing it to Gemini unchanged raised ValidationError on every tool call.
+    from src.rag.llm import to_gemini_schema
+    from src.rag.tools import TOOL_SCHEMAS
+
+    search = next(s for s in TOOL_SCHEMAS if s["name"] == "search_documents")
+
+    converted = to_gemini_schema(search["parameters"])
+
+    assert converted["type"] == "OBJECT"
+    assert converted["properties"]["query"]["type"] == "STRING"
+    assert converted["properties"]["top_k"]["type"] == "INTEGER"
+    # Everything that is not a type must survive untouched.
+    assert converted["required"] == ["query"]
+    assert converted["properties"]["query"]["description"] == "Arama sorgusu (Türkçe)"
+
+
+def test_gemini_schema_conversion_accepts_every_tool_schema():
+    # The real payload the adapter builds must satisfy the SDK's own validator.
+    types = pytest.importorskip("google.genai.types")
+    from src.rag.llm import to_gemini_schema
+    from src.rag.tools import TOOL_SCHEMAS
+
+    declarations = [
+        types.FunctionDeclaration(
+            name=schema["name"],
+            description=schema["description"],
+            parameters=to_gemini_schema(schema["parameters"]),
+        )
+        for schema in TOOL_SCHEMAS
+    ]
+
+    assert len(declarations) == len(TOOL_SCHEMAS)
+
+
 def test_ollama_sends_temperature_in_the_request_options():
     sent = {}
 

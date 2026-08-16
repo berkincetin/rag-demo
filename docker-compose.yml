@@ -1,16 +1,72 @@
+# `docker compose up` tek komutla her şeyi ayağa kaldırır:
+#   :3000  Next.js arayüzü      :8000  HTTP API
+#   :7860  Gradio arayüzü       (ollama içeride, host portu yayımlanmaz)
+#
+# `api` ve `rag` aynı Python imajını paylaşır (7,4 GB) — ikisi için ayrı imaj
+# derlemek bu boyutu iki katına çıkarırdı. Fark yalnızca çalıştırdıkları komut.
+
 services:
+  # İndeksi bir kez üretir ve çıkar. Diğer servisler bunu bekler, böylece
+  # üçü aynı anda ingest çalıştırıp birbirinin üstüne yazmaz.
+  # `.env` isteğe bağlıdır (`required: false`): teslim paketinde sır dosyası
+  # bulunmaz ve o dosya olmadan `docker compose up` hiç başlamazdı. Varsayılanlar
+  # `.env.example` ile aynı; anahtarlar zaten arayüzden de girilebiliyor.
+  ingest:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./data:/app/data
+      - ./storage:/app/storage
+    command: sh -c "[ -f storage/chunks.jsonl ] || python scripts/ingest.py"
+    restart: "no"
+
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      # Tarayıcı her iki servise de host üzerinden gider; konteyner adları
+      # tarayıcı tarafında çözümlenmez.
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+    volumes:
+      - ./data:/app/data
+      - ./storage:/app/storage
+    command: uvicorn src.rag.api:app --host 0.0.0.0 --port 8000
+    depends_on:
+      ingest:
+        condition: service_completed_successfully
+      ollama-init:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: ./web
+      args:
+        # Derleme zamanında gömülür: tarayıcıda çalışan kod host'tan çağırır.
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports: ["3000:3000"]
+    depends_on: [api]
+
   rag:
     build: .
-    ports: ["8501:8501"]
-    env_file: .env
+    ports: ["7860:7860"]
+    env_file:
+      - path: .env
+        required: false
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
     volumes:
       - ./data:/app/data
       - ./storage:/app/storage
+    command: python gradio_app.py
     depends_on:
-      ollama:
-        condition: service_started
+      ingest:
+        condition: service_completed_successfully
       ollama-init:
         condition: service_completed_successfully
 
@@ -19,7 +75,7 @@ services:
     # Deliberately not published on the host. `scripts/setup.py` tells users to
     # install Ollama locally, and a local Ollama already owns host port 11434 —
     # publishing it here made `docker compose up` fail to start on exactly the
-    # machines the setup script prepares. `rag` reaches it by service name.
+    # machines the setup script prepares. Services reach it by name.
     expose: ["11434"]
     volumes: ["ollama:/root/.ollama"]
 

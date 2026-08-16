@@ -3,7 +3,8 @@
 > Bu dosya her fazın sonunda güncellenir. Oturum başında **önce burayı**, sonra
 > [MEMORY.md](MEMORY.md) dosyasını oku. Çalışma kuralları: [CLAUDE.md](CLAUDE.md).
 
-**Son güncelleme:** 2026-08-04
+**Son güncelleme:** 2026-08-06 — arayüz **Streamlit → Gradio** taşındı (port 8501 → **7860**),
+Gemini tool şeması hatası düzeltildi, model `gemini-3.5-flash` oldu. 314 test, %95,07 kapsam.
 **Aktif bölüm:** Her iki bölüm de tamamlandı. Bölüm 1 (14/14) + Sağlayıcı Merkezi
 genişletmesi (17/17) + Bölüm 2 (11/11).
 **Okunacak dosya:** [Bölüm 2 plan genel bakışı](docs/superpowers/plans/analiz/00-overview.md)
@@ -224,3 +225,5 @@ Her faz kapandığında buraya bir satır eklenir.
 | 2026-08-03 | + | Sağlayıcı Merkezi Task 14–17 | `feat(agent)` | 247 passed, %95,05 cov | Kaynak ölçümü (`resources.py`), giriş/çıkış token sütunları, oturum belleği (`memory.py`), kullanıcı adı. Yol boyunca 5 kusur bulundu ve düzeltildi: `st.text_input` her rerun'da yeniden cevaplatıyordu, `inject_context` çıplak soruyla arıyordu, compose host portu çakışıyordu, ad yalnız sistem promptunda etkisizdi, **HNSW `search_ef` geçerli soruya ret ürettiriyordu (ADR-016)** |
 | 2026-08-04 | 2 | Task 1–6 — analiz modülleri | `feat(load)` … `feat(forecast)` | 303 passed, %95,10 cov | Yükleme, temizleme (MF ölçeği), metrikler, grafik stili, walk-forward, LightGBM + ablasyon. İki sızıntı testle yakalandı: seri sınırı ve yinelenen indeks etiketi |
 | 2026-08-04 | 2 | Task 7–11 — notebook A1–A7 + kapanış | `feat(notebook)` + `docs` | 306 passed, %95,04 cov | 52 hücre, `Restart & Run All` hatasız, 10 PNG. PRD §4'ün 11 maddesi tek tek doğrulandı. Yol boyunca 3 kusur bulundu: göreli veri yolu, göreli figür dizini, satır sayısına bakan mevsimsellik eşiği (`C/Ürün 1` için 0,99 mevsimsellik uyduruyordu) |
+| 2026-08-07 | + | README üç katmanı anlatıyor + teslim paketi yenilendi | `docs` | 329 passed, %95 cov · ZIP'ten 320 passed | README'ye FastAPI uç tablosu, `web/` dosya haritası, altı servislik Docker tablosu ve proje ağacı eklendi. `rag-demo.zip` **88 → 189 dosya** (`scripts/package.py` ile). 🚨 İki kusur yalnızca paketi açıp **içinden** çalıştırınca görüldü: `env_file: .env` zorunluydu ve `.env` teslimde bulunmadığı için `docker compose up` hiç başlamıyordu (`required: false` ile düzeltildi); `api.py` kapsam listesinde değildi (%87 → %95) |
+| 2026-08-07 | 2 | Bölüm 2 tek dosyalık teslim paketi | `docs` | notebook izole dizinde 0 hata, 10 grafik; sayılar `analiz.ipynb` ile birebir | `notebooks/analiz_full.ipynb` üretildi: `src/analysis/`'in beş modülü notebook içine alındı, başına `%pip install` hücresi kondu, hiçbir proje modülü import etmiyor. Analiz hücreleri kaynaktan **birebir** kopyalandı (betikle, elle değil). Kopyalanan fonksiyonların modüllerle aynı sonucu verdiği `assert_frame_equal` ile kanıtlandı (LightGBM dahil). `bolum2-analiz.zip` (2,9 MB): çalıştırılmış notebook + 10 PNG + veri + README + requirements. Mevcut kodlara dokunulmadı |

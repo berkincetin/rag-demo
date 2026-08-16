@@ -9,7 +9,7 @@ def test_a_local_model_resolves_to_ollama():
 
 def test_a_cloud_model_resolves_to_its_vendor():
     assert resolve_provider("claude-opus-5") == "anthropic"
-    assert resolve_provider("gemini-2.0-flash") == "gemini"
+    assert resolve_provider("gemini-3.5-flash") == "gemini"
 
 
 def test_an_unknown_model_is_treated_as_local():

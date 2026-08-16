@@ -231,5 +231,9 @@ figures/
 # Claude Code local config and project-scoped skills (superpowers, MIT — not part of delivery)
 .claude/
 
-# Teslim paketi (git archive + data/ ile elle üretilir)
+# Teslim paketi (scripts/package.py ile üretilir — git archive DEĞİL, çünkü
+# web/ ve gradio_app.py untracked, data/ ise bilerek gitignore'da ama pakete girmeli)
 rag-demo.zip
+
+# Bolum 2 teslim paketi (scripts/package_bolum2.py ile uretilir)
+bolum2-analiz.zip

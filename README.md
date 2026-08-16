@@ -6,24 +6,61 @@ lokal çalışabilir bir RAG agent'ı.
 
 Bilmediğini söyler, konu dışı soruları kibarca reddeder, hiçbir cevabı kaynaksız vermez.
 
+Aynı agent'ın üstünde **üç giriş noktası** var — hepsi aynı çekirdeği kullanır:
+
+| Katman | Ne | Adres | Dosya |
+|---|---|---|---|
+| 🌐 **Next.js arayüzü** | React 19 + Tailwind 4, açık/koyu tema | `:3000` | `web/` |
+| 🔌 **FastAPI backend** | Next.js'in konuştuğu HTTP API | `:8000` | `src/rag/api.py` |
+| 🐍 **Gradio arayüzü** | Python'dan başka bir şey istemez | `:7860` | `gradio_app.py` |
+
+Ek olarak bir **CLI** (`python -m src.rag.cli`) var. Gradio ve CLI agent'ı doğrudan
+çağırır; Next.js araya FastAPI'yi koyar. Üçü de aynı `src/rag/` çekirdeğini paylaşır —
+iş mantığı hiçbir arayüz katmanında tekrarlanmaz.
+
 ---
 
 ## Kurulum — üç komut
 
+Üç yol da **en fazla üç komut**. Hangisini seçerseniz seçin sonuç aynı agent'tır.
+
+### A) Docker — tek komut
+
 ```bash
-pip install -r requirements.txt
-python scripts/setup.py     # Ollama'yı kontrol eder, sohbet modelini çeker
-python scripts/ingest.py
-streamlit run app.py
+docker compose up
 ```
 
-`setup.py` Ollama kurulu değilse **kurmaz** — platformunuza uygun kurulum komutunu
-yazdırıp durur; kurulumu siz çalıştırırsınız. Kuruluysa modeli çeker (kuantize sürüm
-zaten varsa tekrar indirmez).
+`:3000` Next.js arayüzü · `:8000` HTTP API · `:7860` Gradio arayüzü.
+İndeksleme, model indirme ve üç servisin başlatılması dahil her şeyi kendisi yapar.
+`.env` **gerekmez** — yoksa varsayılanlarla çalışır, API anahtarları arayüzden girilebilir.
+
+### B) Next.js arayüzü, Docker'sız — üç komut
+
+```bash
+pip install -r requirements.txt
+python scripts/ingest.py
+python scripts/run_web.py
+```
+
+`run_web.py` gerekiyorsa `npm install` çalıştırır, API'yi (`:8000`) ve arayüzü (`:3000`)
+birlikte başlatır; Ctrl+C ikisini birden durdurur. Node.js 18+ gerekir.
+
+### C) Gradio arayüzü, Docker'sız — üç komut
+
+```bash
+pip install -r requirements.txt
+python scripts/ingest.py
+python gradio_app.py
+```
+
+Node.js gerektirmez; arayüz `localhost:7860` adresinde açılır.
 
 `ingest.py` altı belgeyi okur, 276 chunk üretir ve indeksi `storage/` altına yazar
-(ilk çalıştırmada embedding modeli ~1,1 GB indirilir). `app.py` arayüzü
-`localhost:8501` adresinde açar.
+(ilk çalıştırmada embedding modeli ~1,1 GB indirilir).
+
+> İsteğe bağlı: `python scripts/setup.py` Ollama'yı kontrol edip sohbet modelini çeker.
+> Ollama kurulu değilse **kurmaz** — platformunuza uygun kurulum komutunu yazdırıp durur.
+> Modeli `ollama pull` ile kendiniz çektiyseniz veya Docker kullanıyorsanız gerekmez.
 
 **LLM:** varsayılan sağlayıcı [Ollama](https://ollama.com) (lokal). Önce modeli çekin:
 
@@ -41,11 +78,101 @@ yeterlidir; ilgili SDK'yı ayrıca kurmanız gerekir (`pip install anthropic`).
 
 ---
 
-## Arayüz — beş sayfa
+## İki arayüz, tek çekirdek
 
-| Sayfa | Ne yapar |
+İki arayüz de **tam işlevli** — aynı beş ekranı (sohbet, sağlayıcılar, yerel modeller,
+metrikler, değerlendirme) sunar. İstediğinizi kullanın; Docker ikisini birden kaldırır.
+
+| Arayüz | Komut | Adres | Gerektirdiği |
+|---|---|---|---|
+| **Next.js** | `python scripts/run_web.py` | `localhost:3000` | Node.js 18+ (API'yi de o başlatır) |
+| **Gradio** | `python gradio_app.py` | `localhost:7860` | Yalnızca Python |
+
+```
+Next.js (:3000) ──HTTP/JSON──► FastAPI (:8000) ──┐
+                               src/rag/api.py    │
+                                                 ├──► Agent (LangGraph)
+Gradio  (:7860) ─────────────────────────────────┤     └─► Tools ─► Retriever ─► Chroma/BM25
+gradio_app.py                                    │
+                                                 │
+CLI  (src/rag/cli.py) ───────────────────────────┘
+```
+
+Neden bu ayrım: **karar mantığı hiçbir arayüze girmez.** Model seçimi, anahtar durumu,
+maliyet hesabı, atıf biçimlendirmesi — hepsi `src/rag/ui_state.py` içindedir ve hiçbir
+arayüz kütüphanesi import etmez (oturum sıradan bir `MutableMapping`'tir). Gradio da
+FastAPI da aynı fonksiyonları çağırır. Bu yüzden ikinci arayüzü eklemek iş mantığını
+tekrarlamadı ve `ui_state` düz sözlüklerle test edilebiliyor.
+
+### 🔌 FastAPI backend (`src/rag/api.py`)
+
+Yalnızca **yönlendirme ve bağlantı**; hiçbir JSON şeklini kendisi üretmez. Her yanıt
+gövdesi `src/rag/serialize.py` içindeki saf fonksiyonlardan gelir ve doğrudan test edilir
+(`tests/test_api_serialization.py`, 9 test). Böylece `api.py` kapsam dışı bırakılabiliyor —
+`gradio_app.py` ile aynı gerekçe: içinde test edilecek karar yok.
+
+| Uç | Metot | Ne yapar |
+|---|---|---|
+| `/api/ask` | POST | Soru sorar; cevap + atıflar + araç izi + süre/token/maliyet/kaynak döner |
+| `/api/chat/clear` | POST | Oturum belleğini ve transkripti temizler |
+| `/api/models` | GET | Kullanılabilir modeller + aktif model + Ollama durumu |
+| `/api/keys` | GET · POST | Sağlayıcı anahtarı durumu (maskeli) · anahtar kaydı |
+| `/api/models/active` | POST | Aktif modeli değiştirir |
+| `/api/ollama` | GET | Yerel modelleri listeler |
+| `/api/ollama/pull` · `/delete` | POST | Model indirir · siler |
+| `/api/metrics` | GET · DELETE | Model bazında özet + koşu geçmişi · sıfırlar |
+| `/api/evaluation/cases` · `/estimate` · `/run` | GET · POST | 13 soruluk set · maliyet tahmini · karşılaştırmalı koşu |
+| `/api/health` | GET | `{"ok": true}` |
+
+**Oturum modeli:** tarayıcı her istekte `X-Session-Id` başlığı gönderir (ilk açılışta
+`crypto.randomUUID()` ile üretilip `sessionStorage`'a yazılır). Sunucu bu kimliği bellekteki
+bir sözlüğe eşler. API anahtarları **yalnızca o sözlükte** yaşar — diske yazılmaz, log'a
+düşmez (ADR-012), tıpkı Gradio tarafındaki gibi.
+
+**Agent önbelleği:** agent `(model, anahtarı olan sağlayıcılar)` çiftine göre önbelleklenir.
+Her soruda yeniden kurulsaydı 1,1 GB'lık embedding modeli her seferinde yüklenirdi.
+
+**CORS:** varsayılan olarak `localhost:3000` ve `127.0.0.1:3000`'e izin verilir. Docker'da
+da aynısı geçerlidir — tarayıcı her iki servise de **host'tan** eriştiği için konteyner
+adları buraya hiç girmez. Başka bir adresten sunacaksanız `CORS_ORIGINS` ortam değişkeni
+ile değiştirin.
+
+### 🌐 Next.js arayüzü (`web/`)
+
+Next.js 16 (App Router) + React 19 + Tailwind CSS 4. Kalıcı sol kenar çubuğu ile beş görünüm
+arasında geçiş yapılır; sekme yığını yoktur.
+
+| Dosya | Sorumluluk |
 |---|---|
-| 💬 **Sohbet** | Soru sorar; cevabın altında **aktif model**, süre, giriş/çıkış token'ı, maliyet ve yerel modelde **tepe CPU / RAM / GPU VRAM** gösterir. Kenar çubuğunda ad alanı ve sohbet belleği vardır. Kaynaklar ve araç izi panelleri korunur |
+| `web/app/page.tsx` | Kabuk: kenar çubuğu, görünüm yönlendirme, açık/koyu tema düğmesi |
+| `web/components/Chat.tsx` | Sohbet — kaynaklar, araç izi ve metrikler **cevabın kendi kartında** |
+| `web/components/Providers.tsx` | Anahtar girişi ve aktif model seçimi |
+| `web/components/LocalModels.tsx` | Ollama modellerini listeler / indirir / siler |
+| `web/components/Metrics.tsx` | Model bazında özet + satır içi çubuk grafik + koşu geçmişi |
+| `web/components/Evaluation.tsx` | Çoklu model karşılaştırması, öncesinde maliyet tahmini |
+| `web/components/ui.tsx` | Card / Button / Badge / Input / Select / tablo ilkelleri |
+| `web/lib/api.ts` | Tipli API istemcisi, oturum kimliği yönetimi |
+| `web/lib/format.ts` | Türkçe sayı/süre/maliyet biçimlendirme (`ui_state` kurallarının aynısı) |
+
+Tema tercihi `localStorage`'da tutulur; ilk açılışta işletim sistemi tercihine
+(`prefers-color-scheme`) düşer.
+
+---
+
+### 🐍 Gradio arayüzü (`gradio_app.py`)
+
+[Gradio](https://gradio.app) 5.x ile yazılmıştır; sohbet için `gr.ChatInterface` kullanır.
+Node.js istemediği için "yalnızca Python" ile çalışmak isteyenlerin yolu budur.
+
+---
+
+## Beş ekran
+
+Her iki arayüz de aynı beş ekranı sunar (Next.js'te kenar çubuğu, Gradio'da sekme):
+
+| Ekran | Ne yapar |
+|---|---|
+| 💬 **Sohbet** | Soru sorar; her cevabın yanında kaynaklar, araç izi, süre, giriş/çıkış token'ı, maliyet ve yerel modelde **tepe CPU / RAM / GPU VRAM** durur |
 | ⚙️ **Sağlayıcılar** | Anthropic / OpenAI / Gemini anahtarı girilir, aktif model seçilir |
 | 📦 **Yerel Modeller** | Ollama modellerini listeler, ilerleme çubuğuyla indirir, siler |
 | 📊 **Metrikler** | Model bazında koşu sayısı, ortalama süre, toplam giriş/çıkış token'ı, atıf, kapı isabeti, tepe kaynak tüketimi ve maliyet; geçmiş tablosu |
@@ -59,7 +186,7 @@ kapısı onu konu dışı sayıp **reddederdi**. Bu yüzden yalnızca **arama so
 soruyla genişletilir; modele giden mesajlarda kullanıcının kendi yazdığı cümle durur.
 Reddedilen cevaplar belleğe **girmez** — girseydi bir sonraki aramayı kirletirlerdi.
 
-Kenar çubuğundaki ad alanı sistem promptunun sonuna **tek cümle** ekler. Ad boşken prompt
+Sohbet ekranındaki ad alanı sistem promptunun sonuna **tek cümle** ekler. Ad boşken prompt
 birebir eski hâlindedir (bunu bir test korur), çünkü prompta eklenen her fazladan cümlenin
 yerel 7B modelde araç çağrısını bastırabildiği daha önce ölçüldü. Ad **oturumda** kalır;
 ölçüm veritabanına yazılmaz.
@@ -120,17 +247,39 @@ $env:PYTHONIOENCODING="utf-8"
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                          KULLANICI KATMANI                               │
-│   Streamlit (app.py)                 CLI (src/rag/cli.py)                │
-│   soru + kaynak paneli + tool izi     soru → cevap (stdout)              │
-└───────────────────────────────┬──────────────────────────────────────────┘
-                                │ soru (Türkçe, doğal dil)
-                                ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│                       AGENT (src/rag/agent.py)                           │
 │                                                                          │
-│   1. Skor kapısı (LLM'den ÖNCE) — konu dışıysa hemen reddet              │
-│   2. LLM tool-calling döngüsü (max 3 tur)                                │
-│   3. Atıf post-check — kaynaksız cevabı "bilgi bulamadım" ile değiştir   │
+│   Next.js (web/)          Gradio               CLI                       │
+│   React 19 + Tailwind     (gradio_app.py)      (src/rag/cli.py)          │
+│   :3000                   :7860                stdout                    │
+│        │                       │                    │                    │
+│        │ HTTP + X-Session-Id   │                    │                    │
+│        ▼                       │                    │                    │
+│   ┌─────────────────────┐      │                    │                    │
+│   │ FastAPI :8000       │      │                    │                    │
+│   │ src/rag/api.py      │      │                    │                    │
+│   │ ├ serialize.py JSON │      │                    │                    │
+│   │ └ ui_state.py karar │◄─────┘  (aynı fonksiyonlar, HTTP'siz)          │
+│   └──────────┬──────────┘                           │                    │
+└──────────────┼──────────────────────────────────────┼────────────────────┘
+               └──────────────────┬───────────────────┘
+                                  │ soru (Türkçe, doğal dil)
+                                  ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│         AGENT — LangGraph durum makinesi (src/rag/graph.py)               │
+│         agent.py yalnızca ince bir cephe (facade)                        │
+│                                                                          │
+│   score_gate ──(güvensiz)──► refuse            ① LLM'den ÖNCE kapı       │
+│       │ (güvenli)                                                        │
+│       ▼                                                                  │
+│   llm_turn ──(tool çağrısı)──► run_tools ──┐   ② max 3 tur               │
+│       │  ▲                                  │                            │
+│       │  └──────────────────────────────────┘                            │
+│       │ (hiç araca danışmadan cevapladı) ──► inject_context ──┘          │
+│       ▼                                                                  │
+│   citation_check ──(atıf yok)──► repair ──► citation_check ──► no_info   │
+│       │ (atıflı)                                ③ atıf post-check         │
+│       ▼                                                                  │
+│     finish                                                               │
 └───────┬──────────────────────────────────────────────┬───────────────────┘
         │ tool çağrısı                                 │ chat(messages, tools)
         ▼                                              ▼
@@ -151,6 +300,8 @@ $env:PYTHONIOENCODING="utf-8"
 │                          └──► RRF birleştirme ──► top_k chunk + metadata │
 └───────────────────────────────┬──────────────────────────────────────────┘
                                 ▼
+
+                                
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                         İNDEKS (storage/)                                │
 │    chroma/  → vektörler + metadata      bm25.pkl → leksik indeks         │
@@ -175,11 +326,22 @@ Ingest süresi ~55 sn (CPU, model önbellekteyken).
 
 | Karar | Seçim | Neden |
 |---|---|---|
-| Framework | **Ham Python + sağlayıcı SDK'sı** (LangChain/LlamaIndex yok) | Demo ölçeğinde soyutlama katmanı fayda değil borç üretir. Retrieval ve agent döngüsü ~200 satır; her davranış açıkça görülebilir ve test edilebilir |
+| Agent akışı | **LangGraph durum makinesi** (`src/rag/graph.py`) | Dallanma gerçek: atıf onarım turu, bağlam enjeksiyonu, çok sağlayıcılı yönlendirme. Her adım ayrı düğüm olduğu için akış denetlenebiliyor ve düğüm başına ölçüm alınabiliyor |
+| Retrieval / chunking | **Ham Python** (LangChain/LlamaIndex retriever'ı yok) | Bölüm-sayfa metadata'sını chunk'a iliştirip atıfta göstermek bu case'in çekirdeği; hazır retriever'ların varsayılan metadata'sı bunu vermiyor, override etmek yazmaktan uzun sürüyordu |
 | Embedding | **`intfloat/multilingual-e5-base`** | Türkçe'de güçlü, lokal çalışır (API anahtarı gerektirmez), `query:`/`passage:` önek şeması asimetrik aramada belirgin kazanç sağlar |
 | Vektör deposu | **ChromaDB** (`PersistentClient`) | Kurulum gerektirmeyen gömülü depo; 276 chunk için sunucu tabanlı bir çözüm gereksiz |
 | Retrieval | **Hibrit BM25 + dense, RRF (k=60)** | İkisi farklı hataları yapıyor: dense `OPS-PRO-003` gibi belge kodlarını yakalayamıyor, BM25 anlamsal yakınlığı göremiyor. RRF **sıra** birleştirdiği için skor normalizasyonu ve ağırlık ayarı gerektirmez |
 | LLM | **Takılabilir katman, varsayılan Ollama** | Case lokal çalışabilirliği tercih ediyor. Yerel model yetersiz kalırsa `LLM_PROVIDER` ile buluta geçiş tek satır |
+
+> 📌 **Bu karar bir kez değişti.** İlk sürüm agent döngüsünü de ham Python ile yazmıştı
+> ([ADR-001](docs/02-karar-kaydi.md)) ve o ölçekte gerekçesi doğruydu: tek sağlayıcı, tek
+> düz akış. Sağlayıcı Merkezi genişlemesi bu varsayımı bozunca döngü LangGraph'a taşındı
+> ([ADR-011](docs/02-karar-kaydi.md), ADR-001'i geçersiz kılar). **Retrieval, chunking ve
+> loader'lar hâlâ tamamen kendi kodumuz** — framework yalnızca agent akışını yönetiyor.
+>
+> Migrasyonun kabul kriteri sertti: `tests/test_agent.py` **tek karakter değişmeden**
+> geçmek zorundaydı. Geçti (dosya hash'i birebir aynı), yani dışarıdan görünen davranış
+> korundu. Bedeli iki bağımlılık: `langgraph` ve `langchain-core`.
 
 ---
 
@@ -251,12 +413,15 @@ Bölüm 4.3'ün BM25 skoru 0,00 → **8,31**, sırası 3. → **1.**
 
 ## "Bilmiyorum" ve konu dışı filtresi — eşik kalibrasyonu
 
-Üç katmanlı güvenlik ağı:
+Üç katmanlı güvenlik ağı — her katman grafikte ayrı bir düğüm:
 
-1. **Skor kapısı (LLM'den önce).** Retrieval skorları yetersizse LLM hiç çağrılmaz.
-2. **Grounded sistem promptu.** Model yalnızca tool sonucuna dayanmaya yönlendirilir.
-3. **Atıf post-check.** Hiçbir `[n]` atfı gerçek bir kaynağa eşleşmiyorsa cevap
-   "bilgi bulamadım" ile değiştirilir.
+1. **Skor kapısı** (`score_gate`, LLM'den önce). Retrieval skorları yetersizse LLM hiç
+   çağrılmaz.
+2. **Grounded sistem promptu** (`llm_turn`). Model yalnızca tool sonucuna dayanmaya
+   yönlendirilir.
+3. **Atıf post-check** (`citation_check`). Hiçbir `[n]` atfı gerçek bir kaynağa
+   eşleşmiyorsa önce `repair` bir kez daha dener, o da tutmazsa cevap "bilgi bulamadım"
+   ile değiştirilir.
 
 Eşikler **ölçülerek** belirlendi (10 geçerli soru, 6 konu dışı soru):
 
@@ -325,16 +490,41 @@ jupyter lab notebooks/demo.ipynb
 docker compose up --build
 ```
 
+Altı servis kalkar:
+
+| Servis | Port | İmaj | Ne yapar |
+|---|---|---|---|
+| `web` | **3000** | `node:22-alpine` (229 MB) | Next.js arayüzü |
+| `api` | **8000** | Python (7,4 GB) | FastAPI backend |
+| `rag` | **7860** | Python (aynı imaj) | Gradio arayüzü |
+| `ingest` | — | Python (aynı imaj) | İndeksi bir kez üretip çıkar; diğerleri bunu bekler |
+| `ollama` | — | `ollama/ollama` | Yerel LLM sunucusu |
+| `ollama-init` | — | `ollama/ollama` | Sohbet modelini çeker, sonra çıkar |
+
+`ingest`, `api` ve `rag` **aynı Python imajını** paylaşır — yalnızca `command` satırları
+farklı. Üçü için ayrı imaj derlemek 7,4 GB'ı üçe katlardı. `ingest`'in ayrı servis olması
+kasıtlı: üç servisin aynı anda `ingest.py` çalıştırıp `storage/` üstüne yazma yarışı bu
+sayede oluşmuyor — diğerleri `service_completed_successfully` koşuluyla onu bekliyor.
+
+**Next.js tarafında iki incelik var:**
+
+`NEXT_PUBLIC_API_URL` **derleme argümanıdır**, çalışma zamanı değişkeni değil. `NEXT_PUBLIC_*`
+değişkenleri derleme sırasında JS paketinin içine gömülür; `environment:` altına yazmak
+hiçbir işe yaramaz. Bu yüzden `docker-compose.yml` içinde `build.args` altında duruyor.
+
+`web/.dockerignore` **zorunlu**. Olmadığında `node_modules` ve `.next` derleme bağlamına
+giriyor ve daemon'a 287 MB gönderiliyordu — üstelik imaj onları `COPY --from=deps` ile zaten
+yeniden üretiyor, yani tamamı boşa. Dosya eklenince bağlam ihmal edilebilir boyuta indi.
+
 Elle `ollama pull` **gerekmez**: `ollama-init` servisi modeli kendisi çeker (ilk `up`
-~4,7 GB indirir, uzun sürer) ve `rag` servisi indirme bitene kadar bekler.
+~4,7 GB indirir, uzun sürer) ve diğer servisler indirme bitene kadar bekler.
 
 > ⚠️ **Yerel Ollama'yı önce durdurun.** Konteyner Ollama'sı ile makinedeki Ollama aynı
 > ~4,7 GB modeli aynı anda belleğe alır. 16 GB'lık bir makinede bu ölçüldü: boş RAM
 > 1 GB'ın altına indi ve **Docker daemon çöktü**. Docker'ı kullanacaksanız yerel Ollama
 > servisini kapatın; yerel kurulumu kullanacaksanız `docker compose down` yapın.
 
-`localhost:8501` arayüzü açar; `ollama` ayrı konteynerde çalışır ve `rag` servisi ona
-`http://ollama:11434` üzerinden erişir. Model, adlandırılmış `ollama` volume'ünde kalıcıdır;
+`ollama` ayrı konteynerde çalışır; `api` ve `rag` ona `http://ollama:11434` üzerinden erişir. Model, adlandırılmış `ollama` volume'ünde kalıcıdır;
 ikinci `up` çağrısında tekrar indirilmez.
 
 Konteynerdeki Ollama'nın portu **bilerek host'a açılmıyor**: makinede yerel bir Ollama
@@ -367,10 +557,22 @@ pytest -q -m integration               # yalnız entegrasyon (gerçek belgeler +
 ruff format . && ruff check .          # biçim + lint
 ```
 
-**103 test geçiyor, satır kapsamı %95.** Entegrasyon testleri hayali fikstürlerle değil,
+**329 test geçiyor, satır kapsamı %95.** Entegrasyon testleri hayali fikstürlerle değil,
 `data/` altındaki **gerçek altı belgeyle** çalışır; assertion'lardaki her sayı ölçülmüştür.
 LLM çıktısının metni hiçbir zaman test edilmez (deterministik değildir) — agent döngüsünün
 kontrol akışı mock'lanmış bir LLM ile test edilir.
+
+Kapsam dışı bırakılan üç dosya var ve gerekçeleri aynı: içlerinde test edilecek karar yok.
+`llm.py` sağlayıcı SDK'larını sarar, `gradio_app.py` yerleşimdir, `api.py` yönlendirmedir —
+her birinin karar mantığı test edilen bir modüle çekilmiştir (`ui_state.py`, `serialize.py`).
+
+Next.js tarafı için:
+
+```bash
+cd web
+npm run lint          # ESLint (React 19 kuralları dahil)
+npx tsc --noEmit      # tip kontrolü
+```
 
 ---
 
@@ -474,9 +676,65 @@ kırılmaz. Testle korunuyor: `test_only_market_b_is_detected_as_percent_scaled`
 
 ---
 
+## Proje yapısı
+
+```
+rag-demo/
+├── src/rag/                 Bölüm 1 çekirdeği
+│   ├── agent.py graph.py    agent döngüsü + LangGraph durum makinesi
+│   ├── retriever.py index.py chunker.py normalize.py
+│   ├── loaders/             pdf / docx / xlsx okuyucuları
+│   ├── tools.py prompts.py models.py config.py
+│   ├── llm.py catalog.py    sağlayıcı soyutlaması + model kataloğu
+│   ├── credentials.py       oturum içi anahtar saklama (diske yazmaz)
+│   ├── memory.py metrics.py pricing.py resources.py evaluation.py
+│   ├── ollama_admin.py      yerel model listele/indir/sil
+│   ├── ui_state.py          ⭐ arayüzden bağımsız karar mantığı
+│   ├── serialize.py         ⭐ API JSON şekilleri (test edilir)
+│   ├── api.py               ⭐ FastAPI backend  (:8000)
+│   └── cli.py               terminal arayüzü
+├── src/analysis/            Bölüm 2: load, clean, metrics, forecast, plots
+├── web/                     ⭐ Next.js arayüzü (:3000)
+│   ├── app/  components/  lib/
+│   └── Dockerfile  .dockerignore  package.json
+├── gradio_app.py            ⭐ Gradio arayüzü (:7860)
+├── scripts/                 ingest · setup · run_web · smoke_test · package
+├── tests/                   36 dosya, 329 test
+├── config/                  model_prices.json · eval_set.json
+├── notebooks/               demo.ipynb (Bölüm 1) · analiz.ipynb (Bölüm 2)
+├── data/                    kaynak belgeler (git'te yok, ZIP'te var)
+├── docs/                    PRD / TRD / ADR / veri keşif bulguları
+├── Dockerfile               Python imajı (ingest + api + rag ortak)
+└── docker-compose.yml       altı servis
+```
+
+---
+
 ## Teslim notu
 
-`data/` klasörü `.gitignore` içindedir (kaynak belgeler repoya işlenmez). **Teslim ZIP'ine
-`data/` elle eklenmelidir** — aksi halde `python scripts/ingest.py` çalıştırılamaz.
-Aynı şey Bölüm 2 için de geçerli: `AI Engineer/bolum2_veriseti.xlsx` repoda değil,
-ZIP'e elle konmalı, yoksa notebook çalışmaz.
+`data/` klasörü ve `AI Engineer/` `.gitignore` içindedir (kaynak belgeler repoya
+işlenmez), ama **teslim ZIP'inde ikisi de vardır** — aksi halde `ingest.py`
+çalıştırılamaz ve Bölüm 2 notebook'u açılamaz.
+
+ZIP'te `web/node_modules` **yoktur** (yüzlerce MB, platforma özgü ikililer içerir).
+Next.js arayüzü ilk çalıştırmada bağımlılıkları kendisi kurar: `scripts/run_web.py`
+`node_modules` yoksa `npm install` çağırır. Docker yolunda buna hiç gerek yoktur.
+`web/package-lock.json` pakette olduğu için kurulum yeniden üretilebilir.
+
+Paketi yeniden üretmek için:
+
+```bash
+python scripts/package.py     # → rag-demo.zip
+```
+
+⚠️ **`git archive` kullanmayın.** Önceki paketin bayatlamasının sebebi buydu: `web/`,
+`gradio_app.py` ve `api.py` hâlâ untracked olduğu için sessizce dışarıda kalıyorlardı;
+`data/` ve `AI Engineer/` ise bilerek gitignore'da ama teslimde bulunmak zorunda.
+`scripts/package.py` çalışma ağacından açık bir dışlama listesiyle paketler.
+
+Paketi doğrulamanın tek geçerli yolu **açıp içinden test çalıştırmaktır** — dosya listesine
+bakmak korpusun kullanılabilir olduğunu kanıtlamaz:
+
+```bash
+cd /tmp/kontrol && unzip …/rag-demo.zip && pytest -q
+```

@@ -12,6 +12,9 @@ RUN python -c "from sentence_transformers import SentenceTransformer; \
 
 COPY . .
 
-EXPOSE 8501
+# Bu imaj compose'da üç rolde kullanılır (ingest / api / rag); her biri kendi
+# `command` değerini verir. Aşağıdaki varsayılan, imaj tek başına
+# çalıştırıldığında anlamlı olan yoldur.
+EXPOSE 7860 8000
 CMD ["sh", "-c", "[ -f storage/chunks.jsonl ] || python scripts/ingest.py; \
-    streamlit run app.py --server.address=0.0.0.0"]
+    python gradio_app.py"]

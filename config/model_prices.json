@@ -5,5 +5,5 @@
   "claude-sonnet-5": {"input": 3.0, "output": 15.0},
   "claude-haiku-4-5": {"input": 1.0, "output": 5.0},
   "gpt-4o-mini": {"input": null, "output": null},
-  "gemini-2.0-flash": {"input": null, "output": null}
+  "gemini-3.5-flash": {"input": null, "output": null}
 }

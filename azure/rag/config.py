@@ -18,6 +18,17 @@ from dotenv import load_dotenv
 # variables supply everything.
 _ENV_PATH = Path(__file__).resolve().parents[1] / ".env"  # azure/.env
 
+# These threshold/path/tuning variables are prefixed AZURE_ because
+# src/rag/config.py reads unprefixed names (MIN_COSINE, MIN_BM25, TOP_K,
+# MAX_TOOL_TURNS, DATA_DIR, STORAGE_DIR) via the same os.environ. Both
+# configs call load_dotenv(), which only *sets* a variable if it is not
+# already present — so whichever config loads first silently donates its
+# value to the other when both run in one process (same container, same
+# pytest session). Discovered when azure/tests/test_config.py and
+# tests/test_config.py were run together: the local config's documented
+# 0.80/5.0 defaults were replaced by the Azure placeholder -1.0. Do not
+# remove this prefix without re-verifying that collision is gone.
+
 # Placeholder thresholds. Task 8 replaces these with measured values.
 # They are deliberately NOT the e5 numbers (0.80 / 5.0): those were
 # calibrated against a different embedding model and are invalid here.
@@ -54,11 +65,11 @@ class AzureConfig:
             embedding_deployment=os.getenv(
                 "AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-small"
             ),
-            storage_dir=Path(os.getenv("STORAGE_DIR", "./azure/storage")),
-            data_dir=Path(os.getenv("DATA_DIR", "./data")),
-            top_k=int(os.getenv("TOP_K", "5")),
-            min_cosine=float(os.getenv("MIN_COSINE", str(_UNCALIBRATED_COSINE))),
-            min_bm25=float(os.getenv("MIN_BM25", str(_UNCALIBRATED_BM25))),
-            max_tool_turns=int(os.getenv("MAX_TOOL_TURNS", "3")),
+            storage_dir=Path(os.getenv("AZURE_STORAGE_DIR", "./azure/storage")),
+            data_dir=Path(os.getenv("AZURE_DATA_DIR", "./data")),
+            top_k=int(os.getenv("AZURE_TOP_K", "5")),
+            min_cosine=float(os.getenv("AZURE_MIN_COSINE", str(_UNCALIBRATED_COSINE))),
+            min_bm25=float(os.getenv("AZURE_MIN_BM25", str(_UNCALIBRATED_BM25))),
+            max_tool_turns=int(os.getenv("AZURE_MAX_TOOL_TURNS", "3")),
             internal_token=os.getenv("INTERNAL_TOKEN") or None,
         )

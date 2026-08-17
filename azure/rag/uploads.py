@@ -115,9 +115,18 @@ class UploadStore:
         self._entries.pop(key, None)
 
 
-def build_uploaded_doc(path: Path, embedder: Any) -> UploadedDoc:
-    """Parse, chunk and embed one file. The caller deletes `path` afterwards."""
+def build_uploaded_doc(path: Path, embedder: Any, display_name: str | None = None) -> UploadedDoc:
+    """Parse, chunk and embed one file. The caller deletes `path` afterwards.
+
+    `display_name` is the name the user uploaded. The parser needs a real path,
+    which is a temporary file, and citation labels are built during chunking —
+    so the name is substituted *before* `chunk_sections`, not after, or every
+    citation would read "tmp2wt19fln.txt".
+    """
+    name = display_name or Path(path).name
     sections = load_file(path)
+    for section in sections:
+        section.source_file = name
     chunks = chunk_sections(sections)
     vectors = embedder.encode([chunk.search_text for chunk in chunks])
-    return UploadedDoc(filename=Path(path).name, chunks=chunks, vectors=vectors)
+    return UploadedDoc(filename=name, chunks=chunks, vectors=vectors)

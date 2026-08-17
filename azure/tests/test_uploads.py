@@ -8,7 +8,12 @@ another's documents.
 import pytest
 
 from azure.rag.models import Chunk
-from azure.rag.uploads import UploadedDoc, UploadLimitError, UploadStore
+from azure.rag.uploads import (
+    UploadedDoc,
+    UploadLimitError,
+    UploadStore,
+    build_uploaded_doc,
+)
 
 
 def _doc(filename="a.txt", chunk_count=1):
@@ -171,3 +176,44 @@ def test_sweep_keeps_live_keys():
     store.sweep()
 
     assert store.get("k") != []
+
+
+# --- citation labels --------------------------------------------------------
+
+
+class _StubEmbedder:
+    def encode(self, texts):
+        return [[1.0, 0.0] for _ in texts]
+
+
+def test_uploaded_chunks_cite_the_users_filename_not_the_temp_file(tmp_path):
+    """The parser needs a path, but its generated name must never reach a citation."""
+    temp_like = tmp_path / "tmp2wt19fln.txt"
+    temp_like.write_text("Gizli proje kodu ZPX-9981.", encoding="utf-8")
+
+    doc = build_uploaded_doc(temp_like, _StubEmbedder(), display_name="ozel_proje.txt")
+
+    assert doc.filename == "ozel_proje.txt"
+    for chunk in doc.chunks:
+        assert "tmp2wt19fln" not in chunk.citation_label
+        assert "ozel_proje.txt" in chunk.citation_label
+
+
+def test_a_text_upload_gets_a_clean_citation_label(tmp_path):
+    """A plain text file has no section or page, so neither may be rendered."""
+    path = tmp_path / "notlar.txt"
+    path.write_text("Bir metin.", encoding="utf-8")
+
+    doc = build_uploaded_doc(path, _StubEmbedder())
+
+    label = doc.chunks[0].citation_label
+    assert "None" not in label
+    assert not label.rstrip().endswith("—")
+    assert "notlar.txt" in label
+
+
+def test_display_name_defaults_to_the_file_on_disk(tmp_path):
+    path = tmp_path / "rapor.txt"
+    path.write_text("içerik", encoding="utf-8")
+
+    assert build_uploaded_doc(path, _StubEmbedder()).filename == "rapor.txt"

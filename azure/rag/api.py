@@ -322,14 +322,14 @@ async def upload_document(
         handle.write(contents)
         temp_path = Path(handle.name)
     try:
-        doc = build_uploaded_doc(temp_path, _embedder())
+        # The user's filename is passed in, not patched on afterwards: citation
+        # labels are built during chunking, so the temp name would stick.
+        doc = build_uploaded_doc(temp_path, _embedder(), display_name=filename)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     finally:
         os.remove(temp_path)
 
-    # The temp file's generated name must not leak into citations.
-    doc.filename = filename
     key = _upload_key(session_id, conversation_id)
     try:
         _UPLOADS.add(key, doc)

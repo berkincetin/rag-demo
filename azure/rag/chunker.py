@@ -19,6 +19,10 @@ def build_citation_label(section: RawSection) -> str:
         return f"{section.source_file} — {section.sheet}, satır {section.row}"
     if section.doc_type == "docx":
         return f"{section.source_file} — {section.section_path or section.section_title}"
+    # Plain text carries no section and no page; rendering the generic form
+    # would print "— , s.None". Only uploads produce this type.
+    if section.doc_type == "txt":
+        return section.source_file
     title = f"Bölüm {section.section_id} {section.section_title}".strip()
     if section.section_id is None:
         title = section.section_title or ""

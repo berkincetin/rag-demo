@@ -1,35 +1,50 @@
 "use client";
 
 /**
- * App shell: persistent left rail, one view at a time.
+ * App shell: conversation rail on the left, transcript and composer on the right.
  *
  * Reduced from the local build. The Providers, Local Models and Evaluation
  * views are gone: this deployment talks to one server-held Azure model, so
  * there is no key to enter and no model to pull, and running the evaluation
  * suite from a browser is a cost-amplification path against the Azure quota.
- * What remains is the chat and the metrics it produces, plus sign-out.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Chat } from "@/components/Chat";
-import { Metrics } from "@/components/Metrics";
-import { Model, api } from "@/lib/api";
-import { Badge } from "@/components/ui";
 
-type View = "chat" | "metrics";
-
-const NAV: { id: View; label: string; icon: string }[] = [
-  { id: "chat", label: "Sohbet", icon: "💬" },
-  { id: "metrics", label: "Metrikler", icon: "📊" },
-];
+import ChatPane from "@/components/ChatPane";
+import Composer from "@/components/Composer";
+import Sidebar from "@/components/Sidebar";
+import { STORAGE_KEY } from "@/lib/storage";
+import { useConversations } from "@/lib/useConversations";
 
 export default function Home() {
   const router = useRouter();
-  const [view, setView] = useState<View>("chat");
-  const [models, setModels] = useState<Model[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [offline, setOffline] = useState(false);
+  const {
+    conversations,
+    activeId,
+    active,
+    streaming,
+    uploading,
+    setUploading,
+    toast,
+    setToast,
+    activeDocuments,
+    uploadDocument,
+    removeDocument,
+    sendMessage,
+    regenerate,
+    editAndResend,
+    selectConversation,
+    newConversation,
+    renameConversation,
+    deleteConversation,
+  } = useConversations();
+
+  const [collapsed, setCollapsed] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Lazy initializer rather than an effect: reads the stored choice (falling
   // back to the OS preference) once, on mount, without a second render.
   const [dark, setDark] = useState<boolean>(() => {
@@ -39,120 +54,132 @@ export default function Home() {
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
 
-  const refreshModels = useCallback(async () => {
-    try {
-      const data = await api.models();
-      setModels(data.models);
-      setActiveId(data.activeId);
-      setOffline(false);
-    } catch {
-      setOffline(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Server fetch on mount; state is set from the awaited response, which the
-    // rule cannot distinguish from a synchronous set during the effect.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    refreshModels();
-  }, [refreshModels]);
-
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
     localStorage.setItem("rag-theme", dark ? "dark" : "light");
   }, [dark]);
 
+  async function handleFiles(files: FileList) {
+    setUploading(true);
+    const errors: string[] = [];
+    for (const file of Array.from(files)) {
+      const error = await uploadDocument(file);
+      if (error) errors.push(`${file.name}: ${error}`);
+    }
+    setUploading(false);
+
+    if (errors.length > 0) {
+      setToast(errors[0]);
+    } else {
+      setToast(
+        files.length === 1 ? `${files[0].name} yüklendi` : `${files.length} doküman yüklendi`,
+      );
+    }
+  }
+
   async function signOut() {
+    // Conversations live in this browser, so signing out must clear them —
+    // otherwise the next person at this machine reads the previous session.
+    localStorage.removeItem(STORAGE_KEY);
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/login");
     router.refresh();
   }
 
-  const active = models.find((model) => model.id === activeId);
+  let placeholder = "Sorunuzu yazın";
+  if (streaming) placeholder = "Cevap yazılıyor…";
 
   return (
-    <div className="flex h-screen">
-      <aside className="flex w-56 shrink-0 flex-col border-r bg-[var(--surface)]">
-        <div className="flex items-center gap-2 px-4 py-4">
-          <span className="text-lg">📚</span>
-          <div className="leading-tight">
-            <div className="text-sm font-semibold">Bilgi Asistanı</div>
-            <div className="text-[10px] text-[var(--text-dim)]">RAG Agent</div>
-          </div>
-        </div>
+    <div
+      className="flex h-screen overflow-hidden"
+      onDragOver={(event) => {
+        event.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(event) => {
+        // Only clear when the pointer truly left the window.
+        if (event.currentTarget.contains(event.relatedTarget as Node)) return;
+        setDragging(false);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDragging(false);
+        const files = event.dataTransfer.files;
+        if (files && files.length > 0) void handleFiles(files);
+      }}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.docx,.xlsx,.txt"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          const files = event.target.files;
+          if (files && files.length > 0) void handleFiles(files);
+          event.target.value = "";
+        }}
+      />
 
-        <nav className="flex flex-col gap-0.5 px-2">
-          {NAV.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setView(item.id)}
-              className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition
-                ${
-                  view === item.id
-                    ? "bg-[var(--accent-soft)] font-medium text-[var(--accent)]"
-                    : "text-[var(--text-dim)] hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
-                }`}
+      <Sidebar
+        conversations={conversations}
+        activeId={activeId}
+        collapsed={collapsed}
+        dark={dark}
+        onToggleCollapse={() => setCollapsed((value) => !value)}
+        onToggleTheme={() => setDark((value) => !value)}
+        onSelect={selectConversation}
+        onNew={newConversation}
+        onRename={renameConversation}
+        onDelete={deleteConversation}
+        onSignOut={signOut}
+      />
+
+      <main className="relative flex min-w-0 flex-1 flex-col">
+        <ChatPane
+          messages={active?.messages ?? []}
+          streaming={streaming}
+          onRegenerate={regenerate}
+          onEdit={editAndResend}
+          onPickFile={() => fileInputRef.current?.click()}
+          documentCount={activeDocuments.length}
+          uploading={uploading}
+        />
+
+        <Composer
+          onSend={sendMessage}
+          disabled={streaming}
+          placeholder={placeholder}
+          documents={activeDocuments}
+          onPickFile={() => fileInputRef.current?.click()}
+          onRemoveDocument={removeDocument}
+          uploading={uploading}
+        />
+
+        {dragging && (
+          <div
+            className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center
+              border-2 border-dashed border-[var(--accent)] bg-[var(--accent-soft)]/60"
+          >
+            <p
+              className="rounded-xl bg-[var(--surface)] px-4 py-2 text-sm font-medium
+                text-[var(--text)] shadow-lg"
             >
-              <span>{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="mt-auto flex flex-col gap-2 p-3">
-          <div className="rounded-lg bg-[var(--surface-2)] p-2.5">
-            <div className="text-[10px] uppercase tracking-wide text-[var(--text-dim)]">
-              Aktif model
-            </div>
-            {active ? (
-              <>
-                <div className="mt-0.5 break-all font-mono text-[11px]">{active.id}</div>
-                <div className="mt-1">
-                  <Badge tone="accent">🤖 {active.provider}</Badge>
-                </div>
-              </>
-            ) : (
-              <div className="mt-1 text-[11px] text-[var(--text-dim)]">yükleniyor…</div>
-            )}
-          </div>
-
-          <button
-            onClick={() => setDark((value) => !value)}
-            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm
-              text-[var(--text-dim)] transition hover:bg-[var(--surface-2)]
-              hover:text-[var(--text)]"
-          >
-            {dark ? "☀️" : "🌙"} {dark ? "Açık tema" : "Koyu tema"}
-          </button>
-
-          <button
-            onClick={signOut}
-            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm
-              text-[var(--text-dim)] transition hover:bg-[var(--surface-2)]
-              hover:text-[var(--text)]"
-          >
-            🚪 Çıkış yap
-          </button>
-        </div>
-      </aside>
-
-      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {offline && (
-          <div className="bg-[var(--danger-soft)] px-4 py-2 text-sm text-[var(--danger)]">
-            API&apos;ye ulaşılamıyor.
+              Dokümanları buraya bırakın
+            </p>
           </div>
         )}
-        {/* Chat manages its own scrolling (transcript scrolls, composer is
-            pinned); the other views scroll as a whole page. */}
-        <div
-          className={`min-h-0 flex-1 p-4 ${
-            view === "chat" ? "overflow-hidden" : "overflow-y-auto"
-          }`}
-        >
-          {view === "chat" && <Chat activeModel={activeId} />}
-          {view === "metrics" && <Metrics />}
-        </div>
       </main>
+
+      {toast && (
+        <div
+          className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 animate-rise rounded-xl
+            border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm text-[var(--text)]
+            shadow-lg"
+        >
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

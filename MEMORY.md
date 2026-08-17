@@ -561,6 +561,22 @@ onun ürettiği görseller. Mevcut kodlara dokunulmadı.
 | **Yerelde `INTERNAL_TOKEN` boş** | `azure/.env`'de anahtar var ama değeri yok, bu yüzden yerel backend her isteği 401'liyor (boş beklenen değer = güvenli varsayılan, doğru davranış). Uçtan uca test için `INTERNAL_TOKEN=... uvicorn ...` ile geçici değer verildi |
 | **Kalite kapısı `azure/` kapsamına daraltıldı** | `tests/` altındaki 18 test bu iş başlamadan **zaten** kırıktı (`sentence_transformers`, `statsmodels` kurulu değil; Azure dağıtımı torch'u bilinçli attı). `-o addopts=""` şart: `pyproject`'teki `--cov=src` komut satırından eklenen `--cov=azure` ile *kaldırılmıyor*, üstüne biniyor ve kapsam %54'e düşüyor |
 
+### Aşama 1 canlıya alma + Aşama 2 — Analiz sayfası (2026-08-17)
+
+| Konu | Öğrenilen |
+|---|---|
+| 🚨 **Testler bildirilmemiş bağımlılığı yakalayamaz** | `python-multipart` `azure/requirements.txt`'te yoktu ama geliştirme makinesinde başka bir paketten kurulu olduğu için 163 testin **tamamı geçiyordu**. Konteyner yalnız o dosyayı kurduğundan `api.py` import zamanında `Form data requires "python-multipart"` ile patladı ve revizyon `Failed` oldu. Ders: bir bağımlılık *bildirimini* doğrulayan test, kodu doğrulayan testten farklı bir şey ölçer — `test_requirements.py` bunu yapıyor |
+| 🚨 **`provisioningState: Succeeded` konteynerin ayakta olduğunu göstermez** | Azure isteği kabul ettiğinde `Succeeded` döner; uygulama çökse bile. Gerçek durum `az containerapp revision list` içindeki `healthState` / `runningState`. Bozuk revizyon `Succeeded` raporlarken `Unhealthy/Failed` durumundaydı ve trafiği %100 almıştı |
+| **`latest` etiketiyle push rollout tetiklemez** | Aynı etiket yeniden push edilince Container Apps yeni revizyon açmaz. `--image ...@sha256:<digest>` ile güncellemek gerekiyor; digest `docker push` çıktısından alınıyor |
+| **Push öncesi yerel duman testi ucuz sigortadır** | İkinci kez bozuk imaj göndermemek için imaj yerelde `docker run` ile ayağa kaldırılıp `/api/health` ve `/openapi.json` kontrol edildi. Dört yeni ucun kayıtlı olduğu orada görüldü, canlıda değil |
+| **`.internal.` FQDN halka açık DNS'te çözünür** | Plan "DNS hatası bekle" diyordu; gerçekte Azure edge'i tanınmayan host için **HTML 404** ("Azure Container App - Unavailable") döndürüyor. Sızıntı değil — ayrım, yanıtın uygulamadan (JSON) mı altyapıdan (HTML) mı geldiğine bakılarak yapılıyor |
+| **Next standalone çıktısı `public/`'i kopyalamaz** | Yerelde `.next/standalone/server.js` doğrudan çalıştırılınca figürler 404 verdi. Bu bir kod kusuru değil, Next'in bilinen davranışı; `Dockerfile` zaten `COPY ... /app/public ./public` yapıyor. Üretim yolu imajın içinde doğrulandı (10 PNG, doğru boyutlarda) |
+| **Pandas tablosu ham HTML olarak enjekte edilmedi** | `to_html` çıktısı `<style scoped>` taşıyor ve koyu temada okunmaz metin üretiyor; ayrıca gereksiz enjeksiyon yüzeyi. `HTMLParser` ile başlık + satıra çevrilip uygulamanın kendi tablo bileşeniyle çiziliyor. `<th>` hem başlıkta hem satır etiketinde geçtiği için ayrım `<thead>` içinde olup olmamasıyla yapılıyor |
+| **Figürler JSON'a gömülmedi** | 10 PNG toplam 835 KB; base64 olarak `analysis.json` içine konsaydı dosya ~1,1 MB olur ve her sayfa yüklemesinde parse edilirdi. Ayrı dosya olarak yazılıp yalnızca yolları taşınıyor — JSON 97 KB'de kaldı |
+| **Tema iki rota arasında paylaşılmalı** | Sohbet temayı `<html>` sınıfı + `localStorage` ile yönetiyordu; `/analiz` ayrı bir rota olduğu için mantık kopyalanmasa koyu temadaki kullanıcı açık sayfaya düşerdi. `lib/theme.ts` tek kaynak oldu, sohbet sayfası da ona taşındı |
+| **Bölümleme notebook'un `## ` başlıklarından çıkıyor** | Ayırıcı markdown hücreleri zaten `## ` ile bölüm açıyordu; ek işaretleme gerekmedi. Çapa kimlikleri Türkçe harfler ASCII'ye indirgenerek üretiliyor — `casefold()` tek başına `İ`'yi iki kod noktasına açıp tarayıcıda eşleşmez kimlik üretirdi |
+| **`public/analiz/` giriş arkasında** | `middleware.ts` matcher'ı `_next/static` dışında her şeyi kapsıyor. İddia varsayılmadı, ölçüldü: anonim istek hem `/analiz` hem `/analiz/figur-01.png` için 307 → `/login` |
+
 ## 5. Açık Sorular / Bekleyen Kararlar
 
 - **`gemini-3.5-flash` model ID'si doğrulanmadı.** Kullanıcı verdi, katalogda öyle yazıldı;

@@ -6,36 +6,36 @@
  * `dark:` variant and both themes stay in sync by construction.
  */
 :root {
-  --bg: #f7f7f8;
+  --bg: #f8fafc;
   --surface: #ffffff;
-  --surface-2: #f2f2f4;
-  --border: #e3e3e7;
-  --text: #17171a;
-  --text-dim: #6b6b76;
-  --accent: #4f46e5;
+  --surface-2: #eef2f7;
+  --border: #dbe3ec;
+  --text: #0f172a;
+  --text-dim: #5a6b80;
+  --accent: #005aa9;
   --accent-fg: #ffffff;
-  --accent-soft: #eef2ff;
-  --ok: #0f7b4f;
-  --ok-soft: #e6f5ee;
+  --accent-soft: #e6f0f9;
+  --ok: #38a169;
+  --ok-soft: #e8f5ee;
   --warn: #9a5b00;
   --warn-soft: #fdf3e3;
   --danger: #b4232c;
   --danger-soft: #fdeced;
-  --shadow: 0 1px 2px rgba(16, 16, 20, 0.06), 0 4px 16px rgba(16, 16, 20, 0.05);
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 16px rgba(15, 23, 42, 0.05);
 }
 
 .dark {
-  --bg: #0b0b0e;
-  --surface: #141419;
-  --surface-2: #1c1c23;
-  --border: #2a2a33;
-  --text: #ececf1;
-  --text-dim: #9a9aa8;
-  --accent: #8b85ff;
-  --accent-fg: #12121a;
-  --accent-soft: #1e1b3a;
-  --ok: #4ade80;
-  --ok-soft: #12241c;
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-2: #24334a;
+  --border: #33445f;
+  --text: #e8eef6;
+  --text-dim: #94a7bd;
+  --accent: #3b82f6;
+  --accent-fg: #0b1220;
+  --accent-soft: #1b2f4d;
+  --ok: #22c55e;
+  --ok-soft: #14301f;
   --warn: #fbbf24;
   --warn-soft: #2a2010;
   --danger: #f87171;
@@ -125,9 +125,29 @@ body {
   animation: pulse-dot 1.3s infinite ease-in-out both;
 }
 
+/* Blinking caret at the tail of a streaming answer. */
+@keyframes pulse-cursor {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+.stream-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  background: var(--accent);
+  vertical-align: text-bottom;
+  animation: pulse-cursor 1s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
-  .dot {
+  .dot,
+  .stream-cursor {
     animation: none;
   }
 }

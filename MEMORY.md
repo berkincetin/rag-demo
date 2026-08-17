@@ -544,6 +544,23 @@ onun ürettiği görseller. Mevcut kodlara dokunulmadı.
 
 ---
 
+### Aşama 1 — Arayüz yenileme, akış, yükleme (2026-08-17)
+
+| Konu | Öğrenilen |
+|---|---|
+| 🚨 **`contextvar`'lar iş parçacığına miras geçmez** | Akış, grafiği bir `threading.Thread` içinde koşturuyor. Token alıcısı çağıranın bağlamında kurulursa çalışan iş parçacığı onu **göremez** ve akış sessizce boş kalır. Alıcı thread'in *içinde* kuruluyor (`streaming.py: worker()`) — `copy_context()` ile uğraşmaktan hem daha basit hem daha güvenli |
+| 🚨 **`stream=True` varsayılan olarak `usage` döndürmez** | `stream_options={"include_usage": True}` gönderilmezse token sayıları ve maliyetin tamamı sessizce `null` olur; hata da vermez. Ayrı bir test bu bayrağın gerçekten gönderildiğini sabitliyor. Canlıda doğrulandı: 1539/69 token |
+| **Akan metin *aday*dır, nihai değil** | `citation_check` akış bittikten sonra metni değiştirebiliyor (`repair`), tamamen atabiliyor (`no_info`), ya da `score_gate` LLM'i hiç çağırmadan reddedebiliyor. Bu yüzden `replace` olayı var. Uçtan uca görüldü: "Bitcoin" sorusunda hiç token akmadı, reddetme metni `replace` ile geldi |
+| **Araç çağrısı argümanları parça parça gelir** | Akışta `{"query": "yem` + `ek"}` şeklinde ayrı delta'larda geliyor; `index` alanına göre biriktirilmeden JSON olarak ayrıştırılamaz. Paralel çağrılar da `index` ile ayrışıyor |
+| **Grafiğe hiç dokunulmadı** | Akış bir *kontrol akışı* değişikliği değil, LLM istemcisine takılan bir *gözlem katmanı* olarak eklendi. `graph.py` ve `agent.py` diff'te yok; notlandırılan RAG çekirdeği ve testleri aynen duruyor |
+| 🚨 **Yüklenen parçaların BM25'i korpusunkiyle karşılaştırılamaz** | Farklı IDF tabanı (bir avuç parça vs 276 parçalık korpus). Kapı bu yüzden yüklenen isabetleri **yalnızca kosinüsle** değerlendiriyor; korpus isabetleri ölçülmüş iki sinyalli kuralı koruyor. Aksi hâlde ölçülmemiş sayılar ölçülmüş eşiklerle kıyaslanırdı |
+| **Kapı entegrasyonu olmasa yükleme işe yaramazdı** | Katman 1, LLM'den *önce* skorla reddediyor. Yüklenen belge kapıya girmezse "sadece o dosyada olan" soru modele hiç ulaşmadan reddedilir. Uçtan uca kanıtlandı: belge varken cevap geldi, belge silinince aynı soru reddedildi |
+| 🚨 **`azure/web/lib/` hiç commit edilmemişti** | Kök `.gitignore`'daki `lib/` (Python artefaktı için) `azure/web/lib/`'i de yakalıyordu; `auth.ts`, `api.ts`, `format.ts` git'te yoktu. Taze bir klon **derlenmezdi** — canlı çalışıyordu çünkü Docker imajı yerel dosyalardan derleniyor. Kural `/lib/` olarak köke sabitlendi. `web/lib/` de aynı kurbandı (kapsam dışı, dokunulmadı) |
+| **Alıntı etiketi chunk'lama sırasında üretiliyor** | Yüklemede dosya geçici bir adla diske yazılıyor; `doc.filename`'i sonradan düzeltmek yetmiyordu çünkü `citation_label` çoktan `tmp2wt19fln.txt`'den kurulmuştu. Doğru yer: `chunk_sections`'tan **önce** `section.source_file`'ı değiştirmek |
+| **`txt` için alıntı şablonu yoktu** | `build_citation_label` genel dala düşüp `— , s.None` basıyordu. Korpusta txt yok, bu tip yalnızca yüklemeden geliyor; kendi dalı eklendi |
+| **Yerelde `INTERNAL_TOKEN` boş** | `azure/.env`'de anahtar var ama değeri yok, bu yüzden yerel backend her isteği 401'liyor (boş beklenen değer = güvenli varsayılan, doğru davranış). Uçtan uca test için `INTERNAL_TOKEN=... uvicorn ...` ile geçici değer verildi |
+| **Kalite kapısı `azure/` kapsamına daraltıldı** | `tests/` altındaki 18 test bu iş başlamadan **zaten** kırıktı (`sentence_transformers`, `statsmodels` kurulu değil; Azure dağıtımı torch'u bilinçli attı). `-o addopts=""` şart: `pyproject`'teki `--cov=src` komut satırından eklenen `--cov=azure` ile *kaldırılmıyor*, üstüne biniyor ve kapsam %54'e düşüyor |
+
 ## 5. Açık Sorular / Bekleyen Kararlar
 
 - **`gemini-3.5-flash` model ID'si doğrulanmadı.** Kullanıcı verdi, katalogda öyle yazıldı;

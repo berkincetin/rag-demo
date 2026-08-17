@@ -24,14 +24,17 @@ from collections import defaultdict
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from azure.rag.build import build_agent
 from azure.rag.catalog import list_models
 from azure.rag.config import AzureConfig
+from azure.rag.memory import ConversationMemory
 from azure.rag.metrics import MetricsStore
 from azure.rag.pricing import estimate_cost
 from azure.rag.serialize import answer_payload, model_payload, run_payload, summary_payload
+from azure.rag.streaming import answer_events, format_sse
 
 # Session helpers live in ui_state, mirroring src/rag/ui_state.py.
 from azure.rag.ui_state import (
@@ -120,6 +123,80 @@ def ask(body: AskRequest, x_session_id: str | None = Header(default=None)):
     payload = answer_payload(answer, cost)
     payload["modelId"] = model_id
     return payload
+
+
+class StreamAskRequest(BaseModel):
+    question: str
+    userName: str | None = None
+    # Client-owned conversation state: the browser holds N conversations per
+    # session, so the server cannot key memory by session alone.
+    summary: str | None = None
+    history: list[dict[str, str]] | None = None
+
+
+def _memory_from_client(
+    summary: str | None, history: list[dict[str, str]] | None
+) -> ConversationMemory:
+    """Rebuild a ConversationMemory from what the browser sent.
+
+    Only completed question/answer pairs become turns: a trailing user message
+    with no answer yet is the question being asked right now, not history.
+    """
+    memory = ConversationMemory()
+    question: str | None = None
+    for message in history or []:
+        role = message.get("role")
+        if role == "user":
+            question = message.get("content", "")
+        elif role == "assistant" and question is not None:
+            memory.add(question, message.get("content", ""))
+            question = None
+    return memory
+
+
+@app.post("/api/ask/stream", dependencies=[Depends(require_internal_token)])
+def ask_stream(body: StreamAskRequest, x_session_id: str | None = Header(default=None)):
+    """Answer as a stream of SSE events.
+
+    The agent graph is unchanged; `answer_events` runs it on a worker thread and
+    turns the text deltas the LLM client publishes into `token` events.
+    """
+    session_id = x_session_id or "default"
+    _check_rate_limit(session_id)
+
+    question = (body.question or "").strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Soru boş olamaz.")
+
+    session = _session(session_id)
+    set_user_name(session, body.userName or "")
+    memory = _memory_from_client(body.summary, body.history)
+    model_id = list_models()[0].id
+
+    def run(_emit):
+        answer = _agent().answer(question, memory=memory, user_name=get_user_name(session))
+        return {"text": answer.text, "citations": list(answer.citations), "answer": answer}
+
+    def on_meta(result):
+        answer = result.get("answer")
+        if answer is None:
+            return {"citations": [], "grounded": False, "modelId": model_id}
+        cost = estimate_cost(model_id, answer.usage.input_tokens, answer.usage.output_tokens)
+        payload = answer_payload(answer, cost)
+        payload["modelId"] = model_id
+        return payload
+
+    def body_stream():
+        for event in answer_events(run, on_meta=on_meta):
+            yield format_sse(event)
+
+    return StreamingResponse(
+        body_stream(),
+        media_type="text/event-stream",
+        # Without these an intermediary may buffer the whole body and the
+        # stream arrives as one lump.
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/api/chat/clear", dependencies=[Depends(require_internal_token)])

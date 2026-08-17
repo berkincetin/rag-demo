@@ -4,6 +4,8 @@ The agent is stubbed so these tests exercise routing and auth without calling
 Azure OpenAI. Nothing here asserts on model output text.
 """
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -179,3 +181,76 @@ def test_rate_limit_runs_before_validation(client, monkeypatch):
     response = client.post("/api/ask", json={"question": "  "}, headers=AUTH)
 
     assert response.status_code == 429
+
+
+# --- streaming ---------------------------------------------------------------
+
+
+def test_ask_stream_emits_sse_frames(client):
+    response = client.post(
+        "/api/ask/stream", json={"question": "Yakıt limiti nedir?"}, headers=AUTH
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    body = response.text
+    assert '"type": "start"' in body
+    assert '"type": "meta"' in body
+
+
+def test_ask_stream_meta_carries_the_answer_payload(client):
+    response = client.post("/api/ask/stream", json={"question": "soru"}, headers=AUTH)
+
+    meta = [
+        json.loads(line[len("data: ") :])
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    ][-1]
+
+    assert meta["type"] == "meta"
+    assert meta["citations"] == ["arac.docx — 3. ARAC TAHSIS POLITIKASI"]
+    assert meta["grounded"] is True
+    assert meta["modelId"] == "gpt-4.1-mini"
+
+
+def test_ask_stream_replaces_text_that_never_streamed(client):
+    """The stub never emits deltas, so the whole answer arrives as a replace."""
+    response = client.post("/api/ask/stream", json={"question": "soru"}, headers=AUTH)
+
+    events = [
+        json.loads(line[len("data: ") :])
+        for line in response.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    replace = [event for event in events if event["type"] == "replace"]
+
+    assert replace and replace[0]["content"] == "Aylık yakıt limiti 1.500 TL/ay'dır [1]."
+
+
+def test_ask_stream_rejects_an_empty_question(client):
+    response = client.post("/api/ask/stream", json={"question": "   "}, headers=AUTH)
+
+    assert response.status_code == 400
+
+
+def test_ask_stream_requires_the_internal_token(client):
+    response = client.post("/api/ask/stream", json={"question": "x"})
+
+    assert response.status_code == 401
+
+
+def test_ask_stream_rebuilds_memory_from_client_history(client):
+    from azure.rag import api
+
+    memory = api._memory_from_client(
+        "önceki özet",
+        [
+            {"role": "user", "content": "İzin nasıl alınır?"},
+            {"role": "assistant", "content": "Formu doldurun."},
+            {"role": "user", "content": "Peki müdür seviyesinde?"},
+        ],
+    )
+
+    # Only completed pairs become turns; the dangling question is not a turn.
+    assert len(memory) == 1
+    assert memory.last_turn().question == "İzin nasıl alınır?"

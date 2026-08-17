@@ -39,6 +39,7 @@ from azure.rag.metrics import MetricsStore
 from azure.rag.pricing import estimate_cost
 from azure.rag.serialize import answer_payload, model_payload, run_payload, summary_payload
 from azure.rag.streaming import answer_events, format_sse
+from azure.rag.summarize import summarize_messages
 
 # Session helpers live in ui_state, mirroring src/rag/ui_state.py.
 from azure.rag.ui_state import (
@@ -258,6 +259,30 @@ def ask_stream(body: StreamAskRequest, x_session_id: str | None = Header(default
 def clear(x_session_id: str | None = Header(default=None)):
     clear_chat(_session(x_session_id))
     return {"ok": True}
+
+
+# --- summarization -----------------------------------------------------------
+
+
+def _summary_llm():
+    """The chat client, reused for summarising."""
+    return _agent().llm
+
+
+class SummarizeRequest(BaseModel):
+    previousSummary: str = ""
+    messages: list[dict[str, str]]
+
+
+@app.post("/api/summarize", dependencies=[Depends(require_internal_token)])
+def summarize(body: SummarizeRequest, x_session_id: str | None = Header(default=None)):
+    """Fold the oldest block of messages into one cumulative summary."""
+    _check_rate_limit(x_session_id or "default")
+    # Validated before the LLM is touched: a bad request must not require the
+    # model client to exist, let alone bill for a call.
+    if not body.messages:
+        raise HTTPException(status_code=400, detail="Özetlenecek mesaj yok.")
+    return {"summary": summarize_messages(_summary_llm(), body.previousSummary, body.messages)}
 
 
 # --- uploaded documents ------------------------------------------------------

@@ -416,3 +416,39 @@ def test_streaming_uses_the_bare_agent_without_uploads(upload_client, monkeypatc
     )
 
     assert called["wrapped"] is False
+
+
+# --- summarization -----------------------------------------------------------
+
+
+def test_summarize_returns_a_summary(client, monkeypatch):
+    from azure.rag import api
+
+    class _StubLLM:
+        def chat(self, messages, tools=None):
+            return type("R", (), {"text": "birleşik özet"})()
+
+    monkeypatch.setattr(api, "_summary_llm", lambda: _StubLLM())
+
+    response = client.post(
+        "/api/summarize",
+        json={"previousSummary": "", "messages": [{"role": "user", "content": "a"}]},
+        headers=AUTH,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["summary"] == "birleşik özet"
+
+
+def test_summarize_rejects_an_empty_message_list(client):
+    response = client.post(
+        "/api/summarize", json={"previousSummary": "", "messages": []}, headers=AUTH
+    )
+
+    assert response.status_code == 400
+
+
+def test_summarize_requires_the_internal_token(client):
+    response = client.post("/api/summarize", json={"previousSummary": "", "messages": []})
+
+    assert response.status_code == 401

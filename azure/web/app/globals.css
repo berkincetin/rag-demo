@@ -151,3 +151,87 @@ body {
     animation: none;
   }
 }
+
+/*
+ * Analiz sayfasının anlatı metni. Notebook markdown'ı başlık, liste, tablo ve
+ * vurgulu metin taşıyor; Tailwind varsayılanları bunları sıfırladığı için
+ * tipografi burada tek yerden veriliyor. Renkler token'lardan gelir, böylece
+ * iki tema da ayrıca ele alınmadan doğru çalışır.
+ */
+.analysis-prose {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+
+.analysis-prose > * + * {
+  margin-top: 0.7em;
+}
+
+.analysis-prose strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.analysis-prose h3,
+.analysis-prose h4 {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 1.2em;
+}
+
+.analysis-prose ul,
+.analysis-prose ol {
+  padding-left: 1.3em;
+}
+
+.analysis-prose ul {
+  list-style: disc;
+}
+
+.analysis-prose ol {
+  list-style: decimal;
+}
+
+.analysis-prose code {
+  background: var(--surface-2);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  font-size: 0.92em;
+  color: var(--text);
+}
+
+.analysis-prose a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.analysis-prose blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 0.9em;
+  color: var(--text-dim);
+}
+
+/* Yönetici özeti markdown tablosu — kod tarafındaki tablolarla aynı görünür. */
+.analysis-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  display: block;
+  overflow-x: auto;
+}
+
+.analysis-prose th,
+.analysis-prose td {
+  border: 1px solid var(--border);
+  padding: 0.35em 0.6em;
+  text-align: left;
+}
+
+.analysis-prose th {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+}

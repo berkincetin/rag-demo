@@ -1,0 +1,1584 @@
+{
+ "sections": [
+  {
+   "id": "giris",
+   "title": "Giriş",
+   "blocks": [
+    {
+     "type": "narrative",
+     "markdown": "# Bölüm 2 — İlaç Sektörü Satış ve Talep Analizi (tek dosya sürümü)\n\nDört pazar (A, B, C, D) × 124 ay (2016-01 → 2026-04) satış verisi üzerinde case'in\nyedi analiz sorusu.\n\n> 📦 **Bu notebook kendi kendine yeterlidir.** `src/analysis/` altındaki beş modülün\n> (`load`, `clean`, `metrics`, `forecast`, `plots`) tamamı aşağıya fonksiyon olarak\n> yazıldı; hiçbir proje modülü import edilmiyor. Tek gereken veri dosyası\n> `bolum2_veriseti.xlsx`.\n\nHer görevin altında iki ayrı yorum var: **Teknik yorum** (yöntem, sınırlılık,\nistatistiksel güven) ve **İş yorumu** (ne yapılmalı).\n\n> ⚠️ **Önce okunması gereken:** `MF Oran` kolonu B Pazarı'nda yüzde (0–100),\n> diğer pazarlarda oran (0–1) ölçeğinde. Düzeltilmezse `Net Kutu = Brüt × (1 − MF)`\n> negatife düşüyor ve birim fiyat 8,32 TL yerine **−0,88 TL** çıkıyor. A4, A6 ve A7\n> bu düzeltme olmadan tamamen yanlış olurdu. Düzeltme sabit \"B Pazarı\" kuralıyla\n> değil, **grup medyanına bakan program tespitiyle** yapılıyor."
+    }
+   ]
+  },
+  {
+   "id": "yonetici-ozeti",
+   "title": "Yönetici özeti",
+   "blocks": [
+    {
+     "type": "narrative",
+     "markdown": "---\n\nAşağıdaki her satır bu notebook'ta hesaplanmış bir sayıya dayanır; ilgili bölümde\nkodu ve grafiği var.\n\n| # | Soru | Bulgu |\n|---|---|---|\n| **A1** | Son 2 yılın performansı | Dört pazarda hacim sıralaması ciro sıralamasıyla **uyuşmuyor**: D Pazarı kutuda ikinci, ciroda sonuncuya yakın. C Pazarı'nda hacmin **%100'ü** tek üründe, B'de %69,5'i `Ürün-FR`'de — ciddi konsantrasyon riski |\n| **A2** | Pazar payı ve rekabet | Şirket 1 dört pazarda da **%15'in altında** (A %12,4 · B %13,3 · C %6,1 · D %4,0). HHI dört pazarda da düşüyor → rekabet artıyor. Şirket 1 her pazarda pazardan hızlı büyümüş, ama C ve D'deki üç haneli CAGR **sıfıra yakın tabandan** geliyor |\n| **A3** | Mevsimsellik | **Güçlü mevsimsellik yok**: 16 hesaplanabilir serinin 15'inde güç 0,50'nin altında. Tek sistematik örüntü A Pazarı'nda **Temmuz zirvesi** (10 üründen 7'si). İki seri için hesap yapılamadı, uydurulmadı |\n| **A4** | MF'in satışa etkisi | 🚨 A Pazarı'nda **anlamlı ve ters yönlü**: yüksek MF ayını izleyen ayda medyan değişim **−%21,7**, normal aylarda +%1,0 (Mann-Whitney p ≈ 3×10⁻¹², FDR q ≈ 9×10⁻¹², Cliff δ = −0,49). Kanal doldurma örüntüsü. B ve D'de anlamlı değil, C'de hiç olay yok |\n| **A5** | Rakip karşılaştırması | 🚨 \"Diğer Şirket hacim kaybediyor\" **mutlak hacimde doğrulanmıyor** — C'de +6.066 ve D'de +17.863 kutu/ay ile anlamlı biçimde **artıyor**. Kayıp yalnız **pay** düzeyinde (A'da −12,2 puan). Pay değişimleri toplamı her pazarda 0 → tutarlılık kontrolü geçti |\n| **A6** | Fiyat ve promosyon maliyeti | Birim fiyat on yılda ~10 katına çıkmış (A: 8,2 → 86,8 TL). D Pazarı diğerlerinin **yarı fiyatında** (47,0 TL). Promosyonun on yıllık maliyeti **108,3 milyon TL** = cironun **%2,93'ü**, 2025'te tek başına 23,0 milyon TL |\n| **A7** | Talep tahmini | 🚨 **Tek mimari her pazarda geçerli değil**: dört pazarda üç farklı kazanan (A: `snaive` WAPE 16,9 · B ve C: `ma3` 10,8 / 9,9 · D: `lgbm` 52,9). MF özellikleri **dört pazarın üçünde** iyileştiriyor, C'de kötüleştiriyor — A4'te C'de hiç MF olayı olmamasıyla tutarlı |\n\n**En kritik teknik bulgu:** `MF Oran` B Pazarı'nda yüzde ölçeğinde. Düzeltilmeden\nA4, A6 ve A7 tamamen yanlış olurdu (birim fiyat −0,88 TL çıkıyor). Düzeltme sabit\npazar adına değil, grup medyanına bakan **program tespitine** dayanıyor.\n\n**Birlikte okununca:** A4 promosyonun talep yaratmayıp öne çektiğini, A6 bunun yılda\n23 milyon TL'ye mal olduğunu gösteriyor. İkisi birlikte promosyon bütçesinin geri\ndönüşünü sorgulamak için yeterli kanıt oluşturuyor."
+    }
+   ]
+  },
+  {
+   "id": "0-kurulum-ve-veri-yolu",
+   "title": "0. Kurulum ve veri yolu",
+   "blocks": [
+    {
+     "type": "narrative",
+     "markdown": "---\n\nAşağıdaki hücre gerekli kütüphaneleri kurar. Sürümler kurulu ortamdan (`pip freeze`)\nbirebir alındı, tahmin edilmedi."
+    },
+    {
+     "type": "code",
+     "source": "# Gerekli kütüphaneler. Ortamda zaten varsa pip bunları atlar.\n%pip install --quiet \\\n    \"pandas==2.2.3\" \\\n    \"numpy==2.2.6\" \\\n    \"openpyxl==3.1.5\" \\\n    \"matplotlib==3.10.9\" \\\n    \"statsmodels==0.14.6\" \\\n    \"scipy==1.15.3\" \\\n    \"scikit-learn==1.7.2\" \\\n    \"lightgbm==4.7.0\"\n\nprint(\"Kurulum tamam.\")"
+    },
+    {
+     "type": "stream",
+     "text": "Note: you may need to restart the kernel to use updated packages.\nKurulum tamam."
+    },
+    {
+     "type": "code",
+     "source": "# Veri dosyasının yeri. Notebook ile aynı klasörde ya da bir üstünde aranır;\n# bulunamazsa DATA_PATH'i elle yazın.\nfrom pathlib import Path\n\n_CANDIDATES = [\n    Path(\"bolum2_veriseti.xlsx\"),\n    Path(\"veri\") / \"bolum2_veriseti.xlsx\",\n    Path(\"..\") / \"bolum2_veriseti.xlsx\",\n    Path(\"..\") / \"AI Engineer\" / \"bolum2_veriseti.xlsx\",\n    Path(\"AI Engineer\") / \"bolum2_veriseti.xlsx\",\n]\nDATA_PATH = next((p for p in _CANDIDATES if p.exists()), None)\n\nif DATA_PATH is None:\n    raise FileNotFoundError(\n        \"bolum2_veriseti.xlsx bulunamadı. Aranan yerler:\\n  \"\n        + \"\\n  \".join(str(p.resolve()) for p in _CANDIDATES)\n        + \"\\n\\nDosyayı bu notebook'un yanına koyun ya da DATA_PATH'i elle atayın.\"\n    )\n\n# Figürler buraya yazılır.\nFIGURE_DIR = Path(\"figures\")\nprint(f\"Veri : {DATA_PATH.resolve()}\")\nprint(f\"Figür: {FIGURE_DIR.resolve()}\")"
+    },
+    {
+     "type": "stream",
+     "text": "Veri : C:\\Users\\Polinity\\AppData\\Local\\Temp\\claude\\c--Users-Polinity-Desktop-berki-WORK-nobel-demo-rag-demo\\9699a167-d82e-45aa-b581-b878a748745b\\scratchpad\\nbrun\\bolum2_veriseti.xlsx\nFigür: C:\\Users\\Polinity\\AppData\\Local\\Temp\\claude\\c--Users-Polinity-Desktop-berki-WORK-nobel-demo-rag-demo\\9699a167-d82e-45aa-b581-b878a748745b\\scratchpad\\nbrun\\figures"
+    }
+   ]
+  },
+  {
+   "id": "0-1-analiz-fonksiyonlari",
+   "title": "0.1 Analiz fonksiyonları",
+   "blocks": [
+    {
+     "type": "narrative",
+     "markdown": "---\n\n`src/analysis/` altındaki beş modülün tamamı burada. Sırasıyla: yükleme (`load`),\ntemizleme (`clean`), türetilmiş metrikler (`metrics`), tahmin (`forecast`) ve\ngrafik stili (`plots`)."
+    },
+    {
+     "type": "code",
+     "source": "import warnings\nfrom collections.abc import Callable\nfrom dataclasses import dataclass, field\n\nimport matplotlib.pyplot as plt\nimport numpy as np\nimport pandas as pd\n\nwarnings.filterwarnings(\"ignore\", category=FutureWarning)\npd.set_option(\"display.width\", 140)\npd.set_option(\"display.max_columns\", 40)\n\nMARKETS = [\"A Pazarı\", \"B Pazarı\", \"C Pazarı\", \"D Pazarı\"]\nKEY = [\"pazar\", \"sirket\", \"urun\"]"
+    },
+    {
+     "type": "code",
+     "source": "# ============================================================================\n# src/analysis/load.py — geniş formatlı çalışma kitabını tidy çerçeveye çevirir\n# ============================================================================\n# Kaynak sayfa 3 satırlık hiyerarşik başlık taşır (Yıl / Ay / Metrik) ve anahtarlar\n# ilk üç kolondadır; `pd.read_excel(header=0)` bu yapıyı yanlış okur. Bu bölüm ham\n# veriyi sadakatle okur — düzeltmelerin tamamı temizleme adımının işidir.\n#\n# DataFrame kolon adları bilinçli olarak Türkçe: kaynak Excel başlıkları\n# (`Brüt Kutu`, `MF Oran`, `Net TL`) Türkçe ve bu ad eşlemesi veriye\n# izlenebilirliği koruyor.\n\nMONTH_NAMES = {\n    \"Ocak\": 1,\n    \"Şubat\": 2,\n    \"Mart\": 3,\n    \"Nisan\": 4,\n    \"Mayıs\": 5,\n    \"Haziran\": 6,\n    \"Temmuz\": 7,\n    \"Ağustos\": 8,\n    \"Eylül\": 9,\n    \"Ekim\": 10,\n    \"Kasım\": 11,\n    \"Aralık\": 12,\n}\n\nEXPECTED_METRICS = {\"Brüt Kutu\", \"MF Oran\", \"Net TL\"}\n_METRIC_COLUMNS = {\"Brüt Kutu\": \"brut_kutu\", \"MF Oran\": \"mf_oran\", \"Net TL\": \"net_tl\"}\n\n_YEAR_ROW = 1\n_MONTH_ROW = 2\n_METRIC_ROW = 3\n_FIRST_DATA_ROW = 4\n_FIRST_VALUE_COL = 3\n\n\ndef load_raw(path=None) -> pd.DataFrame:\n    \"\"\"Çalışma kitabını okur ve tidy çerçeve döndürür.\n\n    Kolonlar: pazar, sirket, urun, tarih, brut_kutu, mf_oran, net_tl.\n    Boş hücreler `NaN` kalır — sıfıra çevrilmez, çünkü ürünün henüz var olmadığı\n    dönem ile gerçek sıfır satış farklı şeylerdir (bulgular §2.4).\n    \"\"\"\n    raw = pd.read_excel(DATA_PATH if path is None else path, sheet_name=0, header=None)\n\n    years = raw.iloc[_YEAR_ROW, _FIRST_VALUE_COL:].ffill().astype(int)\n    months = raw.iloc[_MONTH_ROW, _FIRST_VALUE_COL:].ffill().astype(str).str.strip()\n    metrics = raw.iloc[_METRIC_ROW, _FIRST_VALUE_COL:].astype(str).str.strip()\n\n    unknown_months = set(months) - set(MONTH_NAMES)\n    if unknown_months:\n        raise ValueError(f\"bilinmeyen ay adı: {sorted(unknown_months)}\")\n    if set(metrics) != EXPECTED_METRICS:\n        raise ValueError(f\"beklenmeyen metrik adları: {sorted(set(metrics))}\")\n\n    dates = [\n        pd.Timestamp(year=year, month=MONTH_NAMES[month], day=1)\n        for year, month in zip(years, months, strict=True)\n    ]\n\n    body = raw.iloc[_FIRST_DATA_ROW:, :]\n    keys = body.iloc[:, :_FIRST_VALUE_COL].copy()\n    keys.columns = KEY\n\n    values = body.iloc[:, _FIRST_VALUE_COL:].apply(pd.to_numeric, errors=\"coerce\")\n    values.columns = pd.MultiIndex.from_arrays([dates, metrics.tolist()], names=[\"tarih\", \"metrik\"])\n    values.index = pd.MultiIndex.from_frame(keys)\n\n    tidy = values.stack(\"tarih\", future_stack=True).reset_index()\n    tidy = tidy.rename(columns=_METRIC_COLUMNS).rename_axis(columns=None)\n    tidy[\"pazar\"] = tidy[\"pazar\"].astype(\"category\")\n    tidy[\"sirket\"] = tidy[\"sirket\"].astype(\"category\")\n    tidy[\"urun\"] = tidy[\"urun\"].astype(str)\n\n    ordered = [*KEY, \"tarih\", \"brut_kutu\", \"mf_oran\", \"net_tl\"]\n    return tidy[ordered].sort_values([*KEY, \"tarih\"]).reset_index(drop=True)"
+    },
+    {
+     "type": "code",
+     "source": "# ============================================================================\n# src/analysis/clean.py — ölçülmüş yedi veri kalitesi sorununu düzeltir\n# ============================================================================\n# Her adım hem veriyi değiştirir hem de ne yaptığını sayar; `DataQualityReport`\n# notebook'un açılışında yayımlanır. Hiçbir kayıt sessizce silinmez.\n#\n# 🚨 En kritik adım MF ölçek düzeltmesidir (`detect_mf_scale`). `MF Oran` kolonu\n# B Pazarı'nda yüzde (0–100), diğerlerinde oran (0–1) ölçeğindedir. Düzeltme\n# yapılmazsa `Net Kutu = Brüt × (1 − MF)` negatife düşer, birim fiyat 8,32 TL\n# yerine −0,88 TL çıkar ve A4, A6, A7 görevlerinin tamamı yanlış olur.\n\nMF_LOWER = 0.0\nMF_UPPER = 0.95\nSHORT_SERIES_THRESHOLD = 24\n\n\n@dataclass\nclass DataQualityReport:\n    \"\"\"Temizlemenin ne yaptığının sayısal dökümü.\"\"\"\n\n    raw_rows: int = 0\n    clean_rows: int = 0\n    rescaled_markets: dict = field(default_factory=dict)\n    mf_clipped: int = 0\n    return_rows: int = 0\n    pre_launch_dropped: int = 0\n    short_series: dict = field(default_factory=dict)\n\n\ndef detect_mf_scale(df: pd.DataFrame) -> dict:\n    \"\"\"Her pazar için MF biriminin ölçek faktörünü döndürür (1.0 veya 100.0).\n\n    Kural veriden çıkar, pazar adından değil: pozitif MF değerlerinin medyanı 1'i\n    aşıyorsa o pazar yüzde ölçeğindedir. Sıfırlar medyana katılmaz — MF'in çoğu ayda\n    0 olduğu bir seride sıfırlar medyanı 0'a çeker ve ölçek sorunu gözden kaçardı.\n    \"\"\"\n    factors = {}\n    for market, group in df.groupby(\"pazar\", observed=True):\n        positive = group.loc[group[\"mf_oran\"].notna() & (group[\"mf_oran\"] > 0), \"mf_oran\"]\n        median = positive.median()\n        factors[str(market)] = 100.0 if pd.notna(median) and median > 1 else 1.0\n    return factors\n\n\ndef clean(df: pd.DataFrame):\n    \"\"\"Yedi düzeltmeyi sırayla uygular ve kalite raporuyla birlikte döndürür.\"\"\"\n    report = DataQualityReport(raw_rows=len(df))\n    result = df.copy()\n\n    # V7 — ürün adı normalizasyonu. Ölçek tespitinden önce gelir ki gruplama doğru olsun.\n    result[\"urun\"] = result[\"urun\"].astype(str).str.replace(r\"\\s+\", \" \", regex=True).str.strip()\n\n    # V2 — 🚨 MF ölçek düzeltmesi.\n    factors = detect_mf_scale(result)\n    report.rescaled_markets = {m: f for m, f in factors.items() if f != 1.0}\n    divisor = result[\"pazar\"].astype(str).map(factors)\n    result[\"mf_oran_olcekli\"] = result[\"mf_oran\"] / divisor\n\n    # V3 — ölçek düzeltmesinden sonra bile kalan imkânsız değerleri kırp ve bayrakla.\n    result[\"mf_kirpildi\"] = result[\"mf_oran_olcekli\"].notna() & (\n        (result[\"mf_oran_olcekli\"] < MF_LOWER) | (result[\"mf_oran_olcekli\"] > MF_UPPER)\n    )\n    result[\"mf_oran_temiz\"] = result[\"mf_oran_olcekli\"].clip(MF_LOWER, MF_UPPER)\n    report.mf_clipped = int(result[\"mf_kirpildi\"].sum())\n\n    # V4 — iadeler. Silinmez; toplamlarda kalır, tahmin girdisinde 0'lanır.\n    result[\"iade_mi\"] = (result[\"brut_kutu\"] < 0) | (result[\"net_tl\"] < 0)\n    report.return_rows = int(result[\"iade_mi\"].sum())\n\n    # V5 — serinin ilk pozitif satışından önceki dönem ürünün var olmadığı dönemdir.\n    before = len(result)\n    first_sale = result[result[\"brut_kutu\"] > 0].groupby(KEY, observed=True)[\"tarih\"].min()\n    key_index = pd.MultiIndex.from_frame(result[KEY].astype(str))\n    launch = pd.Series(\n        key_index.map(first_sale.rename_axis(first_sale.index.names)), index=result.index\n    )\n    result = result[launch.notna() & (result[\"tarih\"] >= launch)]\n    report.pre_launch_dropped = before - len(result)\n\n    result = result.reset_index(drop=True)\n    report.clean_rows = len(result)\n    report.short_series = _short_series(result)\n    return result, report\n\n\ndef _short_series(df: pd.DataFrame) -> dict:\n    \"\"\"Mevsimsellik ve tahmin için yetersiz uzunluktaki seriler (V9).\n\n    Uzunluk ölçüsü **satış görülen ay sayısı**dır, satır sayısı değil. Fark önemli:\n    `C Pazarı/Ürün 1` kırpma sonrası 27 satır taşır ama bunların yalnız biri pozitif\n    (2024-01'de 1 kutu), gerisi gerçek sıfır. Satır sayısıyla ölçülseydi seri\n    \"27 aylık geçmişi var\" görünür ve mevsimsellik/tahmin için uygun sanılırdı.\n\n    Bu seriler analizden **çıkarılmaz**; raporda listelenir ki notebook onları\n    gizlemek yerine açıkça \"yetersiz veri\" diye gösterebilsin.\n    \"\"\"\n    if df.empty:\n        return {}\n    with_sales = df[df[\"brut_kutu\"] > 0].groupby(KEY, observed=True).size()\n    return {\n        tuple(map(str, key)): int(n) for key, n in with_sales.items() if n < SHORT_SERIES_THRESHOLD\n    }"
+    },
+    {
+     "type": "code",
+     "source": "# ============================================================================\n# src/analysis/metrics.py — türetilmiş satış metrikleri ve analitik ölçüler\n# ============================================================================\n# Türetilmiş metrikler case'in tanımlarından gelir:\n#\n#     Net Kutu    = Brüt Kutu × (1 − MF Oran)\n#     Birim Fiyat = Net TL / Net Kutu\n#\n# Birim fiyat hesabı `NaN` üretir, `inf` değil: Net Kutu sıfır veya negatifse fiyat\n# tanımsızdır ve sonsuz bir değer bütün ortalamaları sessizce zehirlerdi (V8).\n\nSEASONALITY_MIN_MONTHS = 24\n_PERIOD = 12\n\n\ndef derived_metrics(df: pd.DataFrame) -> pd.DataFrame:\n    \"\"\"`net_kutu` ve `birim_fiyat` kolonlarını ekler.\"\"\"\n    result = df.copy()\n    result[\"net_kutu\"] = result[\"brut_kutu\"] * (1 - result[\"mf_oran_temiz\"])\n    result[\"birim_fiyat\"] = np.where(\n        result[\"net_kutu\"] > 0,\n        result[\"net_tl\"] / result[\"net_kutu\"].where(result[\"net_kutu\"] > 0),\n        np.nan,\n    )\n    return result\n\n\ndef market_share(df: pd.DataFrame, metric: str = \"brut_kutu\") -> pd.DataFrame:\n    \"\"\"Pazar-ay bazında şirket payı (%).\"\"\"\n    totals = df.groupby([\"pazar\", \"tarih\", \"sirket\"], observed=True)[metric].sum().reset_index()\n    market_total = totals.groupby([\"pazar\", \"tarih\"], observed=True)[metric].transform(\"sum\")\n    totals[\"pay\"] = 100.0 * totals[metric] / market_total\n    return totals\n\n\ndef hhi(df: pd.DataFrame, metric: str = \"brut_kutu\") -> pd.DataFrame:\n    \"\"\"Herfindahl-Hirschman endeksi (0–10.000) — pazar-ay bazında yoğunlaşma.\"\"\"\n    shares = market_share(df, metric)\n    result = shares.groupby([\"pazar\", \"tarih\"], observed=True)[\"pay\"].apply(\n        lambda p: float((p**2).sum())\n    )\n    return result.rename(\"hhi\").reset_index()\n\n\ndef yoy_growth(df: pd.DataFrame, metric: str = \"brut_kutu\") -> pd.DataFrame:\n    \"\"\"Pazar-şirket-yıl bazında yıllık büyüme (%).\"\"\"\n    yearly = df.copy()\n    yearly[\"yil\"] = yearly[\"tarih\"].dt.year\n    totals = yearly.groupby([\"pazar\", \"sirket\", \"yil\"], observed=True)[metric].sum().reset_index()\n    totals = totals.sort_values([\"pazar\", \"sirket\", \"yil\"])\n    previous = totals.groupby([\"pazar\", \"sirket\"], observed=True)[metric].shift(1)\n    totals[\"buyume\"] = np.where(\n        previous > 0, 100.0 * (totals[metric] - previous) / previous, np.nan\n    )\n    return totals\n\n\ndef seasonal_index(series: pd.Series):\n    \"\"\"Ay bazında mevsimsel çarpan (ortalama 1,0 civarı). Kısa seride `None`.\n\n    STL kullanılır (`robust=True`): veride promosyon kaynaklı sıçramalar var ve\n    klasik ayrıştırma onlara aşırı tepki verip mevsimselliği çarpıtıyor. 24 aydan\n    kısa serilerde hesap **yapılmaz** — 12 aylık döngünün en az iki tekrarı gerekir,\n    yoksa uydurulmuş bir mevsimsellik raporlanır (V9).\n    \"\"\"\n    components = _stl_components(series)\n    if components is None:\n        return None\n    seasonal = components.seasonal\n    mean = series.mean()\n    if not np.isfinite(mean) or mean == 0:\n        return None\n    index = (seasonal + mean) / mean\n    return index.groupby(index.index.month).mean().rename_axis(\"ay\")\n\n\ndef seasonality_strength(series: pd.Series):\n    \"\"\"Hyndman mevsimsellik gücü: `max(0, 1 − Var(kalan) / Var(kalan + mevsimsel))`.\"\"\"\n    components = _stl_components(series)\n    if components is None:\n        return None\n    residual = components.resid\n    total = residual + components.seasonal\n    if total.var() == 0:\n        return 0.0\n    return float(max(0.0, 1.0 - residual.var() / total.var()))\n\n\ndef _stl_components(series: pd.Series):\n    \"\"\"STL ayrıştırması; bilgilendirici geçmiş yetersizse `None`.\n\n    Eşik **satış görülen ay** sayısına bakar, satır sayısına değil. Fark ölçüldü:\n    `C Pazarı/Ürün 1` kırpma sonrası 28 satır taşıyor ama yalnız bir ayında satış\n    var; satır sayısına bakan bir eşik bunu kabul ediyor ve STL o tek sıçramayı\n    mevsimsellik olarak raporluyordu (güç 0,987, zirve indeksi 8,72). Uydurulmuş\n    mevsimsellik, \"hesaplanamadı\" demekten daha kötüdür.\n    \"\"\"\n    from statsmodels.tsa.seasonal import STL\n\n    clean_series = series.dropna()\n    months_with_sales = int((clean_series > 0).sum())\n    if len(clean_series) < SEASONALITY_MIN_MONTHS or months_with_sales < SEASONALITY_MIN_MONTHS:\n        return None\n    if clean_series.nunique() <= 1:\n        return None\n    return STL(clean_series, period=_PERIOD, robust=True).fit()\n\n\ndef promo_revenue_loss(df: pd.DataFrame) -> pd.DataFrame:\n    \"\"\"Bedava verilen kutuların TL karşılığı — yıl × pazar × ürün toplamı.\"\"\"\n    result = df.copy()\n    result[\"bedava_kutu\"] = result[\"brut_kutu\"] * result[\"mf_oran_temiz\"]\n    result[\"gelir_kaybi_tl\"] = result[\"bedava_kutu\"] * result[\"birim_fiyat\"]\n    result[\"yil\"] = result[\"tarih\"].dt.year\n    return (\n        result.groupby([\"yil\", \"pazar\", \"urun\"], observed=True)[\"gelir_kaybi_tl\"]\n        .sum()\n        .reset_index()\n    )\n\n\ndef price_dispersion(df: pd.DataFrame) -> pd.DataFrame:\n    \"\"\"Aynı ürünün pazarlar arası fiyat varyasyon katsayısı (CV).\n\n    Anahtar `urun` değil `(pazar, urun)`; `Ürün-A` birden fazla şirkette geçtiği için\n    ortalama önce pazar-ürün bazında alınır (V6).\n    \"\"\"\n    per_market = df.groupby([\"urun\", \"pazar\"], observed=True)[\"birim_fiyat\"].mean().reset_index()\n    summary = per_market.groupby(\"urun\", observed=True)[\"birim_fiyat\"].agg([\"mean\", \"std\", \"count\"])\n    summary[\"cv\"] = np.where(\n        summary[\"mean\"] > 0, summary[\"std\"].fillna(0.0) / summary[\"mean\"], np.nan\n    )\n    return summary.reset_index()"
+    },
+    {
+     "type": "code",
+     "source": "# ============================================================================\n# src/analysis/forecast.py — temel modeller ve walk-forward değerlendirme\n# ============================================================================\n# Değerlendirme genişleyen pencereli walk-forward'dır: son 12 ay tek tek tahmin\n# edilir ve her adımda model yalnız o ana kadarki geçmişi görür. Zaman serisinde tek\n# bir train/test bölmesi yanıltıcıdır — tek bir aya denk gelen şans, modelin\n# sıralamasını değiştirebilir.\n#\n# MAPE case'in istediği metrik ama sıfıra yakın gerçek değerlerde patlar; bu veride\n# 9.536 sıfır aylık gözlem var. Bu yüzden MAPE yalnız `y > 0` gözlemlerde hesaplanır\n# ve yanına sıfır-dayanıklı WAPE ile sMAPE konur (V10).\n\nTEST_MONTHS = 12\nMIN_TRAIN_MONTHS = 6\n\nMF_FEATURES = [\"mf_lag_0\", \"mf_lag_1\", \"mf_roll_mean_3\"]\n_BASE_FEATURES = [\n    \"lag_1\",\n    \"lag_2\",\n    \"lag_3\",\n    \"lag_12\",\n    \"roll_mean_3\",\n    \"roll_mean_6\",\n    \"roll_std_3\",\n    \"ay\",\n    \"ceyrek\",\n    \"yil_indeksi\",\n    \"seri_uzunlugu\",\n]\n_CATEGORICALS = [\"pazar\", \"urun\"]\n\nForecaster = Callable[[pd.Series], float]\n\n\ndef naive(history: pd.Series) -> float:\n    \"\"\"ŷ(t+1) = y(t).\"\"\"\n    return float(history.iloc[-1])\n\n\ndef snaive(history: pd.Series) -> float:\n    \"\"\"ŷ(t+1) = y(t−11). Geçmiş 12 aydan kısaysa `naive`'e düşer.\"\"\"\n    if len(history) < 12:\n        return naive(history)\n    return float(history.iloc[-12])\n\n\ndef ma3(history: pd.Series) -> float:\n    \"\"\"ŷ(t+1) = son üç ayın ortalaması.\"\"\"\n    return float(history.iloc[-3:].mean())\n\n\ndef walk_forward(df: pd.DataFrame, forecaster, months: int = TEST_MONTHS) -> pd.DataFrame:\n    \"\"\"Her seri için son `months` ayı bir ay ileri tahmin eder.\n\n    Eğitim penceresi genişler ve **hedef ayı hiçbir zaman içermez** — sızıntı testi\n    bunu doğrular. `MIN_TRAIN_MONTHS`'tan kısa geçmişi olan seriler atlanır; tek\n    gözlemli `C/Ürün 1` gibi seriler burada kodu kırardı.\n    \"\"\"\n    rows = []\n    for key, group in df.groupby(KEY, observed=True):\n        series = group.sort_values(\"tarih\").set_index(\"tarih\")[\"brut_kutu\"]\n        series = series.fillna(0.0).clip(lower=0.0)  # V4: iadeler tahminde 0'lanır\n        if len(series) < MIN_TRAIN_MONTHS + 1:\n            continue\n        targets = series.index[-min(months, len(series) - MIN_TRAIN_MONTHS) :]\n        for target in targets:\n            history = series.loc[series.index < target]\n            if len(history) < MIN_TRAIN_MONTHS:\n                continue\n            rows.append(\n                {\n                    \"pazar\": key[0],\n                    \"sirket\": key[1],\n                    \"urun\": key[2],\n                    \"tarih\": target,\n                    \"gercek\": float(series.loc[target]),\n                    \"tahmin\": float(forecaster(history)),\n                }\n            )\n    return pd.DataFrame(rows, columns=[\"pazar\", \"sirket\", \"urun\", \"tarih\", \"gercek\", \"tahmin\"])\n\n\ndef error_metrics(actual, predicted) -> dict:\n    \"\"\"MAE, RMSE, MAPE (%), WAPE (%), sMAPE (%).\n\n    MAPE yalnız `actual > 0` gözlemlerde hesaplanır; hiç yoksa `NaN` döner —\n    sonsuz bir değer tabloyu okunamaz hale getirirdi.\n    \"\"\"\n    y = np.asarray(actual, dtype=float)\n    yhat = np.asarray(predicted, dtype=float)\n    error = np.abs(y - yhat)\n\n    positive = y > 0\n    mape = float(100.0 * np.mean(error[positive] / y[positive])) if positive.any() else float(\"nan\")\n    wape = float(100.0 * error.sum() / y.sum()) if y.sum() > 0 else float(\"nan\")\n\n    denominator = np.abs(y) + np.abs(yhat)\n    valid = denominator > 0\n    smape = float(100.0 * np.mean(2.0 * error[valid] / denominator[valid])) if valid.any() else 0.0\n\n    return {\n        \"mae\": float(error.mean()),\n        \"rmse\": float(np.sqrt(np.mean((y - yhat) ** 2))),\n        \"mape\": mape,\n        \"wape\": wape,\n        \"smape\": smape,\n    }\n\n\ndef metrics_by_market(result: pd.DataFrame) -> pd.DataFrame:\n    \"\"\"Hata metriklerini pazar bazında tablolar.\n\n    Genel ortalama tek başına yanıltıcıdır: Şirket 1'in 18 serisinin 10'u A\n    Pazarı'nda, dolayısıyla toplu metrik A Pazarı'nın sonucunu gösterir.\n    \"\"\"\n    rows = []\n    for market, group in result.groupby(\"pazar\", observed=True):\n        row = {\"pazar\": market, \"gozlem\": len(group)}\n        row.update(error_metrics(group[\"gercek\"].to_numpy(), group[\"tahmin\"].to_numpy()))\n        rows.append(row)\n    return pd.DataFrame(rows)\n\n\ndef feature_matrix(df: pd.DataFrame, with_mf: bool = True) -> pd.DataFrame:\n    \"\"\"Gecikme, hareketli ortalama, takvim ve kategorik özellikleri üretir.\n\n    Bütün kaydırmalar `(pazar, sirket, urun)` içinde yapılır: bir serinin `lag_1`'i\n    başka bir serinin son ayı olamaz (V6). Kaydırma yönü de kritik — ters çevrilirse\n    model geleceği görür ve metrikler sahte biçimde iyi çıkar.\n    \"\"\"\n    # İndeks burada sıfırlanır: hedef satırları etiketle seçiliyor ve çağıran taraf\n    # yinelenen etiket bırakmış olabilir. Yinelenen etiket, hedef olmaması gereken\n    # kısa bir seriyi tahmin setine sızdırıyordu — testle yakalandı.\n    data = df.sort_values([*KEY, \"tarih\"]).reset_index(drop=True)\n    data[\"brut_kutu\"] = data[\"brut_kutu\"].fillna(0.0).clip(lower=0.0)\n    grouped = data.groupby(KEY, observed=True)[\"brut_kutu\"]\n\n    for lag in (1, 2, 3, 12):\n        data[f\"lag_{lag}\"] = grouped.shift(lag)\n    shifted = grouped.shift(1)\n    by_series = shifted.groupby([data[k] for k in KEY], observed=True)\n    data[\"roll_mean_3\"] = by_series.transform(lambda s: s.rolling(3).mean())\n    data[\"roll_mean_6\"] = by_series.transform(lambda s: s.rolling(6).mean())\n    data[\"roll_std_3\"] = by_series.transform(lambda s: s.rolling(3).std())\n\n    data[\"ay\"] = data[\"tarih\"].dt.month\n    data[\"ceyrek\"] = data[\"tarih\"].dt.quarter\n    data[\"yil_indeksi\"] = data[\"tarih\"].dt.year - int(data[\"tarih\"].dt.year.min())\n    data[\"seri_uzunlugu\"] = data.groupby(KEY, observed=True)[\"tarih\"].transform(\"size\")\n\n    if with_mf:\n        mf_shifted = data.groupby(KEY, observed=True)[\"mf_oran_temiz\"].shift(1)\n        data[\"mf_lag_0\"] = data[\"mf_oran_temiz\"]\n        data[\"mf_lag_1\"] = mf_shifted\n        data[\"mf_roll_mean_3\"] = mf_shifted.groupby(\n            [data[k] for k in KEY], observed=True\n        ).transform(lambda s: s.rolling(3).mean())\n    else:\n        data = data.drop(columns=[c for c in MF_FEATURES if c in data.columns])\n\n    return data\n\n\ndef lgbm_walk_forward(\n    df: pd.DataFrame, with_mf: bool = True, months: int = TEST_MONTHS\n) -> pd.DataFrame:\n    \"\"\"Global LightGBM'i walk-forward değerlendirir.\n\n    Tek model bütün serileri birlikte öğrenir; kısa seriler eğitim havuzunda kalır\n    ama hedef olarak seçilmez (geçmişleri yetersiz). Hedef `log1p` ölçeğinde:\n    hacimler pazarlar arası üç mertebe farklı ve log ölçek olmadan büyük serilerin\n    kaybı modeli domine eder. Tahmin `expm1` ile geri çevrilip 0'a kırpılır.\n    \"\"\"\n    import lightgbm as lgb\n\n    matrix = feature_matrix(df, with_mf=with_mf)\n    features = list(_BASE_FEATURES)\n    if with_mf:\n        features += MF_FEATURES\n    for column in _CATEGORICALS:\n        matrix[column] = matrix[column].astype(\"category\")\n\n    targets = _target_dates(matrix, months)\n    frames = []\n    for target in sorted(targets):\n        train = matrix[matrix[\"tarih\"] < target]\n        test = matrix[(matrix[\"tarih\"] == target) & (matrix.index.isin(targets[target]))]\n        if train.empty or test.empty:\n            continue\n        model = lgb.LGBMRegressor(\n            n_estimators=300,\n            learning_rate=0.05,\n            num_leaves=31,\n            min_child_samples=10,\n            random_state=42,\n            verbose=-1,\n        )\n        model.fit(\n            train[features + _CATEGORICALS],\n            np.log1p(train[\"brut_kutu\"]),\n            categorical_feature=_CATEGORICALS,\n        )\n        predicted = np.expm1(model.predict(test[features + _CATEGORICALS])).clip(min=0.0)\n        frames.append(\n            pd.DataFrame(\n                {\n                    \"pazar\": test[\"pazar\"].astype(str).to_numpy(),\n                    \"sirket\": test[\"sirket\"].astype(str).to_numpy(),\n                    \"urun\": test[\"urun\"].astype(str).to_numpy(),\n                    \"tarih\": test[\"tarih\"].to_numpy(),\n                    \"gercek\": test[\"brut_kutu\"].to_numpy(),\n                    \"tahmin\": predicted,\n                }\n            )\n        )\n\n    if not frames:\n        return pd.DataFrame(columns=[\"pazar\", \"sirket\", \"urun\", \"tarih\", \"gercek\", \"tahmin\"])\n    return (\n        pd.concat(frames).sort_values([\"pazar\", \"sirket\", \"urun\", \"tarih\"]).reset_index(drop=True)\n    )\n\n\ndef _target_dates(matrix: pd.DataFrame, months: int) -> dict:\n    \"\"\"Hangi ayda hangi satırların tahmin edileceği.\n\n    Temel modellerle **aynı** seri seçimini kullanır ki karşılaştırma adil olsun ve\n    ablasyonun iki tarafı aynı katmanlarda değerlendirilsin.\n    \"\"\"\n    targets = {}\n    for _, group in matrix.groupby(KEY, observed=True):\n        ordered = group.sort_values(\"tarih\")\n        if len(ordered) < MIN_TRAIN_MONTHS + 1:\n            continue\n        selected = ordered.iloc[-min(months, len(ordered) - MIN_TRAIN_MONTHS) :]\n        for index, date in zip(selected.index, selected[\"tarih\"], strict=True):\n            targets.setdefault(date, []).append(index)\n    return targets\n\n\ndef mf_ablation(df: pd.DataFrame, months: int = TEST_MONTHS) -> pd.DataFrame:\n    \"\"\"`lgbm` ile `lgbm_no_mf`'i pazar bazında karşılaştırır.\"\"\"\n    with_mf = metrics_by_market(lgbm_walk_forward(df, with_mf=True, months=months))\n    without_mf = metrics_by_market(lgbm_walk_forward(df, with_mf=False, months=months))\n    merged = with_mf.merge(without_mf, on=\"pazar\", suffixes=(\"_mf_ile\", \"_mf_siz\"))\n    merged[\"mae_farki\"] = merged[\"mae_mf_siz\"] - merged[\"mae_mf_ile\"]\n    merged[\"wape_farki\"] = merged[\"wape_mf_siz\"] - merged[\"wape_mf_ile\"]\n    return merged"
+    },
+    {
+     "type": "code",
+     "source": "# ============================================================================\n# src/analysis/plots.py — ortak grafik stili, Türkçe sayı biçimi, PNG yazıcı\n# ============================================================================\n# Her grafik buradan geçer ki dört pazarın rengi her figürde aynı olsun ve sayılar\n# Türkçe biçimde (binlik nokta, ondalık virgül) yazılsın.\n\nMARKET_COLORS = {\n    \"A Pazarı\": \"#1f77b4\",\n    \"B Pazarı\": \"#d62728\",\n    \"C Pazarı\": \"#2ca02c\",\n    \"D Pazarı\": \"#9467bd\",\n}\n\n# Şirket 1 analizin öznesi olduğu için vurgulu; rakipler kasıtlı olarak nötr.\nCOMPANY_COLORS = {\n    \"Şirket 1\": \"#d62728\",\n    \"Şirket 2\": \"#7f7f7f\",\n    \"Diğer Şirket\": \"#c7c7c7\",\n}\n\n\ndef apply_style() -> None:\n    \"\"\"Notebook genelinde geçerli matplotlib ayarlarını kurar.\"\"\"\n    plt.rcParams.update(\n        {\n            \"figure.dpi\": 110,\n            \"savefig.dpi\": 150,\n            \"figure.figsize\": (11, 5),\n            \"axes.grid\": True,\n            \"grid.alpha\": 0.3,\n            \"axes.spines.top\": False,\n            \"axes.spines.right\": False,\n            \"axes.titlesize\": 12,\n            \"axes.labelsize\": 10,\n            \"legend.frameon\": False,\n            \"font.size\": 10,\n        }\n    )\n\n\ndef tr_number(x: float, decimals: int = 0) -> str:\n    \"\"\"Türkçe sayı biçimi: binlik ayracı nokta, ondalık ayracı virgül.\"\"\"\n    text = f\"{x:,.{decimals}f}\"\n    return text.replace(\",\", \"\\x00\").replace(\".\", \",\").replace(\"\\x00\", \".\")\n\n\ndef save_figure(fig, name: str, directory=None):\n    \"\"\"Figürü PNG olarak yazar ve yolunu döndürür.\"\"\"\n    directory = Path(FIGURE_DIR if directory is None else directory)\n    directory.mkdir(parents=True, exist_ok=True)\n    path = directory / f\"{name}.png\"\n    fig.savefig(path, bbox_inches=\"tight\")\n    return path\n\n\napply_style()\nprint(\"Analiz fonksiyonları hazır.\")"
+    },
+    {
+     "type": "stream",
+     "text": "Analiz fonksiyonları hazır."
+    }
+   ]
+  },
+  {
+   "id": "1-veri-kalitesi-raporu",
+   "title": "1. Veri kalitesi raporu",
+   "blocks": [
+    {
+     "type": "narrative",
+     "markdown": "---\n\nAnalizden önce yedi ölçülmüş veri sorunu düzeltiliyor. Hiçbir kayıt sessizce\nsilinmiyor — her düzeltme sayılıyor ve aşağıda raporlanıyor."
+    },
+    {
+     "type": "code",
+     "source": "raw = load_raw()\ncleaned, report = clean(raw)\ndf = derived_metrics(cleaned)\n\nrescale_note = \", \".join(f\"{p} (÷{int(f)})\" for p, f in report.rescaled_markets.items())\nquality = pd.DataFrame(\n    [\n        (\"Ham gözlem\", tr_number(report.raw_rows)),\n        (\"Temiz gözlem\", tr_number(report.clean_rows)),\n        (\"MF ölçeği düzeltilen pazar\", rescale_note),\n        (\"MF kırpılan gözlem [0; 0,95]\", tr_number(report.mf_clipped)),\n        (\"İade (negatif) gözlem\", tr_number(report.return_rows)),\n        (\"İlk satış öncesi atılan gözlem\", tr_number(report.pre_launch_dropped)),\n        (\"Kısa series_ (24 aydan az satış)\", tr_number(len(report.short_series))),\n    ],\n    columns=[\"Kontrol\", \"Değer\"],\n)\nquality"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "",
+      "Kontrol",
+      "Değer"
+     ],
+     "rows": [
+      [
+       "0",
+       "Ham gözlem",
+       "46.376"
+      ],
+      [
+       "1",
+       "Temiz gözlem",
+       "40.469"
+      ],
+      [
+       "2",
+       "MF ölçeği düzeltilen pazar",
+       "B Pazarı (÷100)"
+      ],
+      [
+       "3",
+       "MF kırpılan gözlem [0; 0,95]",
+       "1.548"
+      ],
+      [
+       "4",
+       "İade (negatif) gözlem",
+       "1.185"
+      ],
+      [
+       "5",
+       "İlk satış öncesi atılan gözlem",
+       "5.907"
+      ],
+      [
+       "6",
+       "Kısa series_ (24 aydan az satış)",
+       "57"
+      ]
+     ]
+    },
+    {
+     "type": "code",
+     "source": "# MF ölçek düzeltmesinin somut etkisi — case'in birim fiyat tanımıyla doğrulama.\nsample = cleaned[\n    (cleaned.pazar == \"B Pazarı\")\n    & (cleaned.sirket == \"Şirket 1\")\n    & (cleaned.urun == \"Ürün-FR\")\n    & (cleaned.tarih.isin(pd.to_datetime([\"2016-01-01\", \"2016-03-01\", \"2026-03-01\"])))\n].copy()\nsample[\"fiyat_duzeltmesiz\"] = sample.net_tl / (sample.brut_kutu * (1 - sample.mf_oran))\nsample[\"fiyat_duzeltmeli\"] = sample.net_tl / (sample.brut_kutu * (1 - sample.mf_oran_temiz))\nshown_columns = [\"tarih\", \"brut_kutu\", \"mf_oran\", \"mf_oran_temiz\"]\nsample[shown_columns + [\"fiyat_duzeltmesiz\", \"fiyat_duzeltmeli\"]].round(2)"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "",
+      "tarih",
+      "brut_kutu",
+      "mf_oran",
+      "mf_oran_temiz",
+      "fiyat_duzeltmesiz",
+      "fiyat_duzeltmeli"
+     ],
+     "rows": [
+      [
+       "27209",
+       "2016-01-01",
+       "27378.0",
+       "9.54",
+       "0.10",
+       "-0.88",
+       "8.32"
+      ],
+      [
+       "27211",
+       "2016-03-01",
+       "56533.0",
+       "10.13",
+       "0.10",
+       "-0.79",
+       "8.07"
+      ],
+      [
+       "27331",
+       "2026-03-01",
+       "38257.0",
+       "6.51",
+       "0.07",
+       "-24.08",
+       "141.84"
+      ]
+     ]
+    },
+    {
+     "type": "narrative",
+     "markdown": "**Düzeltmenin kanıtı yukarıdaki tabloda:** ham `MF Oran` değeri 9,54 — bir oran olarak\nokunursa Net Kutu negatife düşüyor ve birim fiyat **eksi** çıkıyor. 100'e bölündüğünde\n2016'da ~8,3 TL, 2026'da ~142 TL oluyor; bu, A Pazarı/Ürün-A'nın 10,3 → 157 TL bandıyla\naynı büyüklük mertebesi ve on yıllık TL enflasyonuyla tutarlı.\n\nKısa seriler analizden **çıkarılmıyor**, ayrıca raporlanıyor — bunlar için mevsimsellik\nve tahmin matematiksel olarak mümkün değil."
+    },
+    {
+     "type": "code",
+     "source": "short_company_one = {k: v for k, v in report.short_series.items() if k[1] == \"Şirket 1\"}\npd.DataFrame(\n    [(p, u, f\"{n} ay satış\") for (p, s, u), n in sorted(short_company_one.items())],\n    columns=[\"Pazar\", \"Ürün\", \"Geçmiş\"],\n)"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "",
+      "Pazar",
+      "Ürün",
+      "Geçmiş"
+     ],
+     "rows": [
+      [
+       "0",
+       "C Pazarı",
+       "Ürün 1",
+       "1 ay satış"
+      ],
+      [
+       "1",
+       "D Pazarı",
+       "Ürün 78",
+       "11 ay satış"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "id": "a1-son-2-yilin-satis-performansi-ve-urun-kirilimi",
+   "title": "A1 — Son 2 yılın satış performansı ve ürün kırılımı",
+   "blocks": [
+    {
+     "type": "narrative",
+     "markdown": "---\n\nVerinin son ayı 2026-04 olduğu için \"son 2 yıl\" = **2024-05 … 2026-04**."
+    },
+    {
+     "type": "code",
+     "source": "LAST_TWO_YEARS_START = pd.Timestamp(\"2024-05-01\")\ncompany_one = df[df.sirket == \"Şirket 1\"]\nlast_two_years = company_one[company_one.tarih >= LAST_TWO_YEARS_START]\n\nfig, axes = plt.subplots(2, 2, figsize=(13, 7), sharex=True)\nfor axis, market in zip(axes.ravel(), MARKETS, strict=True):\n    g = (\n        last_two_years[last_two_years.pazar == market]\n        .groupby(\"tarih\", observed=True)\n        .agg(gross=(\"brut_kutu\", \"sum\"), net_revenue=(\"net_tl\", \"sum\"))\n    )\n    axis.bar(g.index, g.gross, width=20, color=MARKET_COLORS[market], alpha=0.55, label=\"Brüt Kutu\")\n    second_axis = axis.twinx()\n    second_axis.plot(\n        g.index,\n        g.net_revenue / 1e6,\n        color=\"#333333\",\n        linewidth=1.6,\n        label=\"Net TL (milyon)\",\n    )\n    second_axis.grid(False)\n    axis.set_title(f\"{market} — Şirket 1\")\n    axis.set_ylabel(\"Brüt Kutu\")\n    second_axis.set_ylabel(\"Net TL (milyon)\")\nfig.suptitle(\"Son 2 yıl: aylık Brüt Kutu ve Net TL (Şirket 1)\", fontsize=13)\nfig.tight_layout()\nsave_figure(fig, \"a1_pazar_bazinda_satis\")\nplt.show()"
+    },
+    {
+     "type": "figure",
+     "src": "/analiz/figur-01.png",
+     "alt": "<Figure size 1430x770 with 8 Axes>"
+    },
+    {
+     "type": "code",
+     "source": "summary = last_two_years.groupby(\"pazar\", observed=True).agg(\n    brut_kutu=(\"brut_kutu\", \"sum\"), net_tl=(\"net_tl\", \"sum\")\n)\nmean_mf = last_two_years.groupby(\"pazar\", observed=True).mf_oran_temiz.mean()\nsummary[\"birim_fiyat_ort\"] = summary.net_tl / (summary.brut_kutu * (1 - mean_mf))\nsummary.style.format({\"brut_kutu\": \"{:,.0f}\", \"net_tl\": \"{:,.0f}\", \"birim_fiyat_ort\": \"{:,.2f}\"})"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "pazar",
+      "",
+      "",
+      ""
+     ],
+     "rows": [
+      [
+       "A Pazarı",
+       "12,918,121",
+       "1,200,778,640",
+       "94.85"
+      ],
+      [
+       "B Pazarı",
+       "1,372,128",
+       "150,396,579",
+       "117.88"
+      ],
+      [
+       "C Pazarı",
+       "5,378,746",
+       "577,851,376",
+       "107.47"
+      ],
+      [
+       "D Pazarı",
+       "7,335,930",
+       "369,676,206",
+       "50.81"
+      ]
+     ]
+    },
+    {
+     "type": "code",
+     "source": "# Ürün dominasyonu: her pazarda en büyük ürün hacmin yüzde kaçını taşıyor?\nrows = []\nfor market in MARKETS:\n    t = (\n        last_two_years[last_two_years.pazar == market]\n        .groupby(\"urun\", observed=True)\n        .brut_kutu.sum()\n    )\n    t = t.sort_values(ascending=False)\n    t = t[t > 0]\n    rows.append(\n        {\n            \"Pazar\": market,\n            \"Ürün sayısı\": len(t),\n            \"En büyük ürün\": t.index[0],\n            \"Payı (%)\": round(100 * t.iloc[0] / t.sum(), 1),\n            \"İlk 2 ürün payı (%)\": round(100 * t.iloc[:2].sum() / t.sum(), 1),\n        }\n    )\ndominance = pd.DataFrame(rows)\ndominance"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "",
+      "Pazar",
+      "Ürün sayısı",
+      "En büyük ürün",
+      "Payı (%)",
+      "İlk 2 ürün payı (%)"
+     ],
+     "rows": [
+      [
+       "0",
+       "A Pazarı",
+       "10",
+       "Ürün-G",
+       "29.1",
+       "48.4"
+      ],
+      [
+       "1",
+       "B Pazarı",
+       "4",
+       "Ürün-FR",
+       "69.5",
+       "97.3"
+      ],
+      [
+       "2",
+       "C Pazarı",
+       "1",
+       "Ürün 2",
+       "100.0",
+       "100.0"
+      ],
+      [
+       "3",
+       "D Pazarı",
+       "2",
+       "Ürün 77",
+       "60.6",
+       "100.0"
+      ]
+     ]
+    },
+    {
+     "type": "code",
+     "source": "fig, axes = plt.subplots(1, 4, figsize=(15, 3.6), sharey=False)\nfor axis, market in zip(axes, MARKETS, strict=True):\n    g = (\n        last_two_years[last_two_years.pazar == market]\n        .pivot_table(\n            index=\"tarih\", columns=\"urun\", values=\"brut_kutu\", aggfunc=\"sum\", observed=True\n        )\n        .fillna(0.0)\n    )\n    g = g.loc[:, g.sum().sort_values(ascending=False).index]\n    axis.stackplot(g.index, g.T.to_numpy(), labels=list(g.columns))\n    axis.set_title(market)\n    axis.tick_params(axis=\"x\", rotation=45)\n    if g.shape[1] <= 4:\n        axis.legend(fontsize=7, loc=\"upper left\")\naxes[0].set_ylabel(\"Brüt Kutu\")\nfig.suptitle(\"Son 2 yıl: ürün katkısı (Şirket 1)\", fontsize=13)\nfig.tight_layout()\nsave_figure(fig, \"a1_urun_katkisi\")\nplt.show()"
+    },
+    {
+     "type": "figure",
+     "src": "/analiz/figur-02.png",
+     "alt": "<Figure size 1650x396 with 4 Axes>"
+    },
+    {
+     "type": "code",
+     "source": "# Zirve ve dip aylar: ay ortalamasının pazar ortalamasına oranı.\nmonthly = (\n    last_two_years.groupby([\"pazar\", last_two_years.tarih.dt.month], observed=True)\n    .brut_kutu.mean()\n    .rename(\"ort\")\n)\nmonthly = monthly.reset_index().rename(columns={\"tarih\": \"ay\"})\nmonthly[\"endeks\"] = monthly.groupby(\"pazar\", observed=True).ort.transform(\n    lambda s: 100 * s / s.mean()\n)\npeak_trough = pd.DataFrame(\n    [\n        {\n            \"Pazar\": market,\n            \"Zirve ay\": int(g.loc[g.endeks.idxmax(), \"ay\"]),\n            \"Zirve endeks\": round(g.endeks.max(), 1),\n            \"Dip ay\": int(g.loc[g.endeks.idxmin(), \"ay\"]),\n            \"Dip endeks\": round(g.endeks.min(), 1),\n        }\n        for market, g in monthly.groupby(\"pazar\", observed=True)\n    ]\n)\npeak_trough"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "",
+      "Pazar",
+      "Zirve ay",
+      "Zirve endeks",
+      "Dip ay",
+      "Dip endeks"
+     ],
+     "rows": [
+      [
+       "0",
+       "A Pazarı",
+       "7",
+       "135.7",
+       "8",
+       "85.9"
+      ],
+      [
+       "1",
+       "B Pazarı",
+       "10",
+       "115.4",
+       "4",
+       "87.5"
+      ],
+      [
+       "2",
+       "C Pazarı",
+       "10",
+       "111.8",
+       "2",
+       "91.7"
+      ],
+      [
+       "3",
+       "D Pazarı",
+       "9",
+       "162.9",
+       "7",
+       "44.5"
+      ]
+     ]
+    },
+    {
+     "type": "narrative",
+     "markdown": "#### Teknik yorum\n\nDört pazar hacim olarak üç mertebe farklı değil ama **büyüklük sıralaması ciroyla\nuyuşmuyor**: D Pazarı kutu bazında ikinci sırada, Net TL bazında sonuncuya yakın —\nyani D'de birim fiyat belirgin şekilde düşük. Bu, A6'daki fiyat analizinin\nhabercisidir ve ciro ile hacmi ayrı okumak gerektiğini gösterir.\n\nÜrün kırılımında C Pazarı bir uç durum: iki üründen biri (`Ürün 1`) son iki yılda\ntek bir kutu bile satmamış, dolayısıyla hacmin **%100'ü** tek üründe. B Pazarı'nda da\ntek ürün (`Ürün-FR`) hacmin ~%70'ini taşıyor. A Pazarı on ürünle en dengeli dağılıma\nsahip; en büyük ürünün payı %30'un altında.\n\nZirve/dip endeksleri burada yalnız iki yılın ortalaması — mevsimsellik iddiası için\nzayıf bir temel. Asıl mevsimsellik ölçümü A3'te STL ile, 124 ayın tamamı üzerinden\nyapılıyor.\n\n#### İş yorumu\n\nC ve B pazarlarındaki tek ürün yoğunlaşması **konsantrasyon riski**: o üründe bir\ntedarik kesintisi ya da fiyat baskısı, pazarın tamamını götürür. A Pazarı'nın dengeli\nportföyü bu açıdan sağlıklı. D Pazarı'nda hacim yüksek ama ciro düşük — buradaki\nişin kârlılığı ayrıca sorgulanmalı (A6'daki birim fiyat ve promosyon maliyeti\ntablosuyla birlikte okunmalı)."
+    }
+   ]
+  },
+  {
+   "id": "a2-pazar-paylari-ve-rekabet-pozisyonu",
+   "title": "A2 — Pazar payları ve rekabet pozisyonu",
+   "blocks": [
+    {
+     "type": "narrative",
+     "markdown": "---\n\nPaylar `Brüt Kutu` üzerinden, pazar-ay bazında hesaplanıyor. Üç oyuncu: Şirket 1\n(ana firma), Şirket 2 (doğrudan rakip), Diğer Şirket (pazardaki diğer tüm firmalar)."
+    },
+    {
+     "type": "code",
+     "source": "shares = market_share(df)\n\nfig, axes = plt.subplots(2, 2, figsize=(13, 7), sharey=True)\nfor axis, market in zip(axes.ravel(), MARKETS, strict=True):\n    g = shares[shares.pazar == market].pivot_table(\n        index=\"tarih\", columns=\"sirket\", values=\"pay\", observed=True\n    )\n    order = [s for s in [\"Şirket 1\", \"Şirket 2\", \"Diğer Şirket\"] if s in g.columns]\n    g = g[order].fillna(0.0)\n    axis.stackplot(g.index, g.T.to_numpy(), labels=order, colors=[COMPANY_COLORS[s] for s in order])\n    axis.set_title(market)\n    axis.set_ylim(0, 100)\n    axis.set_ylabel(\"Pay (%)\")\naxes[0, 0].legend(loc=\"upper left\", fontsize=8)\nfig.suptitle(\"Pazar payı gelişimi, 2016 → 2026 (Brüt Kutu)\", fontsize=13)\nfig.tight_layout()\nsave_figure(fig, \"a2_pazar_paylari\")\nplt.show()"
+    },
+    {
+     "type": "figure",
+     "src": "/analiz/figur-03.png",
+     "alt": "<Figure size 1430x770 with 4 Axes>"
+    },
+    {
+     "type": "code",
+     "source": "# 2016 ve last 12 ay payları yan yana — değişimin yönü.\nfirst_year = (\n    shares[shares.tarih.dt.year == 2016].groupby([\"pazar\", \"sirket\"], observed=True).pay.mean()\n)\nlast_year = (\n    shares[shares.tarih >= shares.tarih.max() - pd.DateOffset(months=11)]\n    .groupby([\"pazar\", \"sirket\"], observed=True)\n    .pay.mean()\n)\ncomparison = pd.concat([first_year.rename(\"2016 (%)\"), last_year.rename(\"Son 12 ay (%)\")], axis=1)\ncomparison[\"Değişim (puan)\"] = comparison[\"Son 12 ay (%)\"] - comparison[\"2016 (%)\"]\ncomparison.round(1)"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "pazar",
+      "sirket",
+      "",
+      "",
+      ""
+     ],
+     "rows": [
+      [
+       "A Pazarı",
+       "Diğer Şirket",
+       "47.5",
+       "35.3",
+       "-12.2"
+      ],
+      [
+       "Şirket 1",
+       "6.5",
+       "12.4",
+       "5.9"
+      ],
+      [
+       "Şirket 2",
+       "46.0",
+       "52.3",
+       "6.3"
+      ],
+      [
+       "B Pazarı",
+       "Diğer Şirket",
+       "38.2",
+       "42.4",
+       "4.2"
+      ],
+      [
+       "Şirket 1",
+       "10.1",
+       "13.3",
+       "3.2"
+      ],
+      [
+       "Şirket 2",
+       "51.7",
+       "44.3",
+       "-7.4"
+      ],
+      [
+       "C Pazarı",
+       "Diğer Şirket",
+       "49.8",
+       "48.1",
+       "-1.7"
+      ],
+      [
+       "Şirket 2",
+       "50.2",
+       "45.9",
+       "-4.3"
+      ],
+      [
+       "D Pazarı",
+       "Diğer Şirket",
+       "90.2",
+       "76.0",
+       "-14.2"
+      ],
+      [
+       "Şirket 2",
+       "9.8",
+       "19.9",
+       "10.1"
+      ],
+      [
+       "C Pazarı",
+       "Şirket 1",
+       "NaN",
+       "6.1",
+       "NaN"
+      ],
+      [
+       "D Pazarı",
+       "Şirket 1",
+       "NaN",
+       "4.0",
+       "NaN"
+      ]
+     ]
+    },
+    {
+     "type": "code",
+     "source": "# HHI: pazar yoğunlaşması artıyor mu?\nh = hhi(df)\nfig, axis = plt.subplots(figsize=(11, 4))\nfor market in MARKETS:\n    g = h[h.pazar == market].set_index(\"tarih\").hhi.rolling(12, min_periods=6).mean()\n    axis.plot(g.index, g, label=market, color=MARKET_COLORS[market])\naxis.axhline(2500, color=\"#999999\", linestyle=\"--\", linewidth=1)\naxis.text(h.tarih.min(), 2600, \"yüksek yoğunlaşma eşiği (2.500)\", fontsize=8, color=\"#666666\")\naxis.set_title(\"Pazar yoğunlaşması — HHI (12 aylık hareketli ortalama)\")\naxis.set_ylabel(\"HHI (0–10.000)\")\naxis.legend()\nfig.tight_layout()\nsave_figure(fig, \"a2_hhi\")\nplt.show()"
+    },
+    {
+     "type": "figure",
+     "src": "/analiz/figur-04.png",
+     "alt": "<Figure size 1210x440 with 1 Axes>"
+    },
+    {
+     "type": "code",
+     "source": "# \"Orantısız pay\": pazar toplamı ne kadar büyüdü, Şirket 1 ne kadar?\n# 2026 kısmi bir yıl (yalnız 4 ay) olduğu için hesap 2016–2025 tam yılları üzerinden.\n# Her pazarda Şirket 1'in **kendi** varlık aralığı kullanılır: D Pazarı'nda ürünler\n# 2021 ve 2025'te başlıyor, 2016'dan CAGR hesaplamak anlamsız olurdu.\ndef _compute_cagr(first_value: float, last_value: float, year_span: int) -> float:\n    if year_span <= 0 or first_value <= 0 or last_value <= 0:\n        return float(\"nan\")\n    return 100 * ((last_value / first_value) ** (1 / year_span) - 1)\n\n\nrows = []\nfor market in MARKETS:\n    g = df[df.pazar == market]\n    market_yearly = g.groupby(g.tarih.dt.year, observed=True).brut_kutu.sum()\n    company_yearly = (\n        g[g.sirket == \"Şirket 1\"].groupby(g.tarih.dt.year, observed=True).brut_kutu.sum()\n    )\n    common_years = [\n        y for y in range(2016, 2026) if market_yearly.get(y, 0) > 0 and company_yearly.get(y, 0) > 0\n    ]\n    if len(common_years) < 2:\n        rows.append({\"Pazar\": market, \"Aralık\": \"yetersiz veri\"})\n        continue\n    first, last = common_years[0], common_years[-1]\n    market_cagr = _compute_cagr(market_yearly[first], market_yearly[last], last - first)\n    company_cagr = _compute_cagr(company_yearly[first], company_yearly[last], last - first)\n    rows.append(\n        {\n            \"Pazar\": market,\n            \"Aralık\": f\"{first}–{last}\",\n            \"Pazar CAGR (%)\": round(market_cagr, 1),\n            \"Şirket 1 CAGR (%)\": round(company_cagr, 1),\n            \"Fark (puan)\": round(company_cagr - market_cagr, 1),\n        }\n    )\ncagr_table = pd.DataFrame(rows)\ncagr_table"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "",
+      "Pazar",
+      "Aralık",
+      "Pazar CAGR (%)",
+      "Şirket 1 CAGR (%)",
+      "Fark (puan)"
+     ],
+     "rows": [
+      [
+       "0",
+       "A Pazarı",
+       "2016–2025",
+       "2.8",
+       "10.2",
+       "7.4"
+      ],
+      [
+       "1",
+       "B Pazarı",
+       "2016–2025",
+       "0.8",
+       "3.2",
+       "2.4"
+      ],
+      [
+       "2",
+       "C Pazarı",
+       "2017–2025",
+       "4.3",
+       "131.8",
+       "127.5"
+      ],
+      [
+       "3",
+       "D Pazarı",
+       "2021–2025",
+       "14.1",
+       "186.5",
+       "172.4"
+      ]
+     ]
+    },
+    {
+     "type": "narrative",
+     "markdown": "#### Teknik yorum\n\nŞirket 1'in payı dört pazarda da **%15'in altında**: A'da ~%12, B'de ~%13, C'de ~%6,\nD'de ~%4. Yani Şirket 1 hiçbir pazarda lider değil; A ve B'de Şirket 2 açık ara önde,\nC ve D'de pazarın büyük kısmı \"Diğer Şirket\" çatısı altındaki dağınık rekabette.\n\nHHI dört pazarda da düşüş eğiliminde — yani **yoğunlaşma azalıyor, rekabet artıyor**.\nD Pazarı 2016'da 8.240 ile neredeyse tekelci bir yapıdayken bugün 6.226'ya inmiş; en\nbüyük yapısal değişim orada. Yine de dört pazar da 2.500 eşiğinin çok üzerinde,\nyani hepsi \"yüksek yoğunlaşmalı\" sayılır.\n\n\"Orantısız pay\" sorusunun cevabı **evet, dört pazarda da**: Şirket 1 her pazarda\npazarın kendisinden hızlı büyümüş (A'da 10,2 vs 2,8; B'de 3,2 vs 0,8). Ama bu tablo\ndikkatli okunmalı.\n\n⚠️ **İki uyarı.** (1) 2026 kısmi bir yıl (yalnız 4 ay) olduğu için hesap 2016–2025\ntam yılları üzerinden; aksi hâlde son yıl yapay olarak düşük çıkardı. (2) C Pazarı'nda\n%131,8 ve D Pazarı'nda %186,5'lik CAGR **sıfıra yakın bir tabandan** geliyor:\nŞirket 1 C'ye 2017'de, D'ye 2021'de girmiş ve ilk yıl hacmi çok küçük. Böyle bir\ntabanda CAGR matematiksel olarak doğru ama iş anlamında yanıltıcıdır — bu yüzden\nher satırda hesabın hangi aralıkta yapıldığı ayrıca yazılıyor. Pay tablosu (yukarıda)\nbu büyümenin Şirket 1'i hâlâ %6 ve %4 seviyesinde bıraktığını gösteriyor.\n\n#### İş yorumu\n\nŞirket 1 için en gerçekçi büyüme alanı **B Pazarı**: payı görece yüksek (~%13) ve\npazar Şirket 2 ile paylaşılıyor, yani rekabet iki oyuncu arasında — pay almak için\ndağınık bir kalabalıkla değil tek rakiple mücadele etmek gerekiyor. D Pazarı'nda ise\n%4'lük pay ve düşük birim fiyat birlikte okunduğunda, yatırım yapılacak yer olup\nolmadığı ciddi biçimde sorgulanmalı.\n\nİyi haber: Şirket 1 dört pazarda da pazardan hızlı büyüyor, yani pay **kazanıyor**.\nKötü haber: başladığı taban o kadar düşük ki A ve B'de bile on yılda liderliğe yakın\nbir yere gelememiş. C ve D'deki üç haneli büyüme oranlarını hedef olarak sunmak\nyanıltıcı olur — oradaki asıl soru büyüme hızı değil, mutlak hacmin anlamlı bir\nseviyeye çıkıp çıkmayacağı."
+    }
+   ]
+  },
+  {
+   "id": "a3-mevsimsellik",
+   "title": "A3 — Mevsimsellik",
+   "blocks": [
+    {
+     "type": "narrative",
+     "markdown": "---\n\nMevsimsel indeks ve mevsimsellik gücü **STL ayrıştırmasıyla** (`robust=True`)\nhesaplanıyor. Veride promosyon kaynaklı sıçramalar var; klasik ayrıştırma onlara\naşırı tepki verip mevsimselliği çarpıtıyor.\n\n⚠️ **24 aydan az satış görmüş serilerde hesap yapılmıyor.** 12 aylık döngünün en az\niki tekrarı gerekiyor. Bu eşik satır sayısına değil **satış görülen ay** sayısına\nbakıyor: `C Pazarı/Ürün 1` kırpma sonrası 28 satır taşıyor ama yalnız bir ayında\nsatışı var — satır sayısına bakan bir eşik bunu kabul ediyor ve STL o tek sıçramayı\n\"mevsimsellik gücü 0,99\" diye raporluyordu. Uydurulmuş mevsimsellik, \"hesaplanamadı\"\ndemekten daha kötüdür."
+    },
+    {
+     "type": "code",
+     "source": "rows = []\nfor (market, product), g in company_one.groupby([\"pazar\", \"urun\"], observed=True):\n    series_ = g.sort_values(\"tarih\").set_index(\"tarih\").brut_kutu.astype(float)\n    strength = seasonality_strength(series_)\n    index_ = seasonal_index(series_)\n    with_sales = int((series_ > 0).sum())\n    rows.append(\n        {\n            \"Pazar\": market,\n            \"Ürün\": product,\n            \"Satışlı ay\": with_sales,\n            \"Mevsimsellik gücü\": None if strength is None else round(strength, 3),\n            \"Zirve ay\": None if index_ is None else int(index_.idxmax()),\n            \"Zirve endeksi\": None if index_ is None else round(float(index_.max()), 2),\n            \"Not\": (\n                \"yetersiz veri\"\n                if strength is None\n                else (\"sınırda — 3 döngüden az\" if with_sales < 36 else \"\")\n            ),\n        }\n    )\nseasonality = pd.DataFrame(rows)\nseasonality"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "",
+      "Pazar",
+      "Ürün",
+      "Satışlı ay",
+      "Mevsimsellik gücü",
+      "Zirve ay",
+      "Zirve endeksi",
+      "Not"
+     ],
+     "rows": [
+      [
+       "0",
+       "A Pazarı",
+       "Ürün-A",
+       "124",
+       "0.481",
+       "9.0",
+       "1.19",
+       ""
+      ],
+      [
+       "1",
+       "A Pazarı",
+       "Ürün-B",
+       "124",
+       "0.368",
+       "3.0",
+       "1.17",
+       ""
+      ],
+      [
+       "2",
+       "A Pazarı",
+       "Ürün-C",
+       "124",
+       "0.289",
+       "7.0",
+       "1.14",
+       ""
+      ],
+      [
+       "3",
+       "A Pazarı",
+       "Ürün-D",
+       "124",
+       "0.160",
+       "7.0",
+       "1.12",
+       ""
+      ],
+      [
+       "4",
+       "A Pazarı",
+       "Ürün-E",
+       "124",
+       "0.235",
+       "7.0",
+       "1.14",
+       ""
+      ],
+      [
+       "5",
+       "A Pazarı",
+       "Ürün-F",
+       "124",
+       "0.136",
+       "9.0",
+       "1.27",
+       ""
+      ],
+      [
+       "6",
+       "A Pazarı",
+       "Ürün-G",
+       "124",
+       "0.324",
+       "7.0",
+       "1.20",
+       ""
+      ],
+      [
+       "7",
+       "A Pazarı",
+       "Ürün-H",
+       "124",
+       "0.286",
+       "7.0",
+       "1.21",
+       ""
+      ],
+      [
+       "8",
+       "A Pazarı",
+       "Ürün-I",
+       "124",
+       "0.304",
+       "7.0",
+       "1.22",
+       ""
+      ],
+      [
+       "9",
+       "A Pazarı",
+       "Ürün-J",
+       "124",
+       "0.304",
+       "7.0",
+       "1.19",
+       ""
+      ],
+      [
+       "10",
+       "B Pazarı",
+       "Ürün-FP",
+       "27",
+       "0.997",
+       "2.0",
+       "2.93",
+       "sınırda — 3 döngüden az"
+      ],
+      [
+       "11",
+       "B Pazarı",
+       "Ürün-FQ",
+       "120",
+       "0.091",
+       "10.0",
+       "1.29",
+       ""
+      ],
+      [
+       "12",
+       "B Pazarı",
+       "Ürün-FR",
+       "124",
+       "0.339",
+       "1.0",
+       "1.17",
+       ""
+      ],
+      [
+       "13",
+       "B Pazarı",
+       "Ürün-FS",
+       "124",
+       "0.453",
+       "6.0",
+       "1.33",
+       ""
+      ],
+      [
+       "14",
+       "C Pazarı",
+       "Ürün 1",
+       "1",
+       "NaN",
+       "NaN",
+       "NaN",
+       "yetersiz veri"
+      ],
+      [
+       "15",
+       "C Pazarı",
+       "Ürün 2",
+       "101",
+       "0.179",
+       "11.0",
+       "1.18",
+       ""
+      ],
+      [
+       "16",
+       "D Pazarı",
+       "Ürün 77",
+       "52",
+       "0.177",
+       "3.0",
+       "1.34",
+       ""
+      ],
+      [
+       "17",
+       "D Pazarı",
+       "Ürün 78",
+       "11",
+       "NaN",
+       "NaN",
+       "NaN",
+       "yetersiz veri"
+      ]
+     ]
+    },
+    {
+     "type": "code",
+     "source": "# Isı haritası: ürün × ay mevsimsel indeksi (yalnız hesaplanabilen seriler).\ncomputable = [\n    (\n        (market, product),\n        seasonal_index(g.sort_values(\"tarih\").set_index(\"tarih\").brut_kutu.astype(float)),\n    )\n    for (market, product), g in company_one.groupby([\"pazar\", \"urun\"], observed=True)\n]\ncomputable = [(k, v) for k, v in computable if v is not None]\n\nheatmap = pd.DataFrame({f\"{k[0]} / {k[1]}\": v for k, v in computable}).T\n\nfig, axis = plt.subplots(figsize=(11, 5.5))\nimage = axis.imshow(heatmap.to_numpy(), aspect=\"auto\", cmap=\"RdYlGn\", vmin=0.6, vmax=1.4)\naxis.set_xticks(range(12), [str(a) for a in heatmap.columns])\naxis.set_yticks(range(len(heatmap)), list(heatmap.index))\naxis.set_xlabel(\"Ay\")\naxis.set_title(\"Mevsimsel index_ (1,00 = yıllık ortalama) — Şirket 1\")\nfig.colorbar(image, ax=axis, label=\"indeks\")\naxis.grid(False)\nfig.tight_layout()\nsave_figure(fig, \"a3_mevsimsellik_isi_haritasi\")\nplt.show()"
+    },
+    {
+     "type": "figure",
+     "src": "/analiz/figur-05.png",
+     "alt": "<Figure size 1210x605 with 2 Axes>"
+    },
+    {
+     "type": "narrative",
+     "markdown": "#### Teknik yorum\n\n**Şirket 1'in hiçbir ürününde güçlü mevsimsellik yok.** Hesaplanabilen 16 serinin\n15'inde mevsimsellik gücü 0,50'nin altında; en yükseği A Pazarı/Ürün-A'da 0,48.\nHyndman ölçeğinde 0,64 üzeri \"belirgin mevsimsel\" sayılır — bu eşiği aşan tek seri\nB Pazarı/Ürün-FP (0,997) ve o da güvenilir değil: yalnız 27 aylık geçmişi var, yani\nSTL'e 2,25 döngü veriliyor. Bu durum tabloda \"sınırda\" olarak işaretlendi.\n\nYine de sistematik bir örüntü var: **A Pazarı'nın on ürününden yedisinde zirve ay\nTemmuz**, ikisinde Eylül. Yani A Pazarı'nda ürün bazında değil **pazar seviyesinde**\nbir yaz zirvesi var ve tek tek ürünlerde zayıf görünmesinin sebebi gürültü.\n\n🚨 **Veri gerçeğinin sınırı:** case \"aynı ürünün farklı pazarlardaki örüntüsü\"nü\nsoruyor ama Şirket 1'in ürün setleri pazarlar arası **ayrık** — A'da Ürün-A…J,\nB'de FP…FS, C'de Ürün 1–2, D'de 77–78. Hiçbir ürün birden fazla pazarda yok.\nDolayısıyla bu karşılaştırma ürün seviyesinde **yapılamıyor**; analiz pazar\nseviyesinde toplulaştırılmış karşılaştırmaya dönüşüyor. Bu bir eksiklik değil,\nverinin yapısı.\n\n#### İş yorumu\n\nMevsimsellik zayıf olduğu için **stok planlaması mevsime göre değil, promosyon\ntakvimine göre yapılmalı** — A4'ün gösterdiği gibi asıl dalgalanmayı MF yaratıyor,\nmevsim değil. A Pazarı'ndaki Temmuz zirvesi tek eyleme dönüştürülebilir bulgu:\nüretim ve kanal doldurma Mayıs–Haziran'da planlanmalı.\n\n`C/Ürün 1` ve `D/Ürün 78` için mevsimsel hedef koymak veriye dayanmaz; bu iki ürün\niçin hedefler ancak birkaç yıl daha veri biriktikten sonra anlamlı olur."
+    }
+   ]
+  },
+  {
+   "id": "a4-mal-fazlasinin-mf-bir-sonraki-ay-satisina-etkisi",
+   "title": "A4 — Mal fazlasının (MF) bir sonraki ay satışına etkisi",
+   "blocks": [
+    {
+     "type": "narrative",
+     "markdown": "---\n\n**Olay çalışması.** Olay = `MF Oran > %10` olan (seri, ay) çiftleri. Sonuç ölçüsü\nbir sonraki ayın değişimi: `Δ = brut_kutu[t+1] / brut_kutu[t] − 1`. Kontrol grubu\naynı serilerin `MF ≤ %10` olan ayları.\n\nİki test birlikte: **Mann-Whitney U** (dağılım varsayımı yok — Δ dağılımı çarpık) ve\n**Welch t-testi** (eşit varyans varsaymıyor). Etki büyüklüğü **Cliff's delta**.\nDört pazar aynı anda test edildiği için p-değerleri **Benjamini-Hochberg FDR** ile\ndüzeltiliyor."
+    },
+    {
+     "type": "code",
+     "source": "from scipy import stats\nfrom statsmodels.stats.multitest import multipletests\n\nevents = company_one.sort_values([\"pazar\", \"urun\", \"tarih\"]).copy()\nevents[\"sonraki\"] = events.groupby([\"pazar\", \"urun\"], observed=True).brut_kutu.shift(-1)\nevents[\"delta\"] = np.where(events.brut_kutu > 0, events.sonraki / events.brut_kutu - 1, np.nan)\nevents[\"yuksek_mf\"] = events.mf_oran_temiz > 0.10\nevents = events.dropna(subset=[\"delta\"])\n\nprint(\n    f\"Toplam gözlem: {len(events)}  |  \"\n    f\"olay: {int(events.yuksek_mf.sum())}  |  \"\n    f\"kontrol: {int((~events.yuksek_mf).sum())}\"\n)"
+    },
+    {
+     "type": "stream",
+     "text": "Toplam gözlem: 1783  |  olay: 89  |  kontrol: 1694"
+    },
+    {
+     "type": "code",
+     "source": "def _cliff_delta(a: np.ndarray, b: np.ndarray) -> float:\n    return float(np.sign(a[:, None] - b[None, :]).sum() / (len(a) * len(b)))\n\n\nMIN_EVENTS = 5\nrows = []\nfor market, g in events.groupby(\"pazar\", observed=True):\n    o = g[g.yuksek_mf].delta.to_numpy()\n    k = g[~g.yuksek_mf].delta.to_numpy()\n    row = {\"Pazar\": market, \"Olay n\": len(o), \"Kontrol n\": len(k)}\n    if len(o) < MIN_EVENTS or len(k) < MIN_EVENTS:\n        row[\"Sonuç\"] = \"test edilemedi (yetersiz events)\"\n        rows.append(row)\n        continue\n    _, p_mwu = stats.mannwhitneyu(o, k, alternative=\"two-sided\")\n    _, p_welch = stats.ttest_ind(o, k, equal_var=False)\n    row.update(\n        {\n            \"Olay medyan Δ\": round(float(np.median(o)), 3),\n            \"Kontrol medyan Δ\": round(float(np.median(k)), 3),\n            \"Mann-Whitney p\": p_mwu,\n            \"Welch p\": p_welch,\n            \"Cliff δ\": round(_cliff_delta(o, k), 3),\n        }\n    )\n    rows.append(row)\n\nmf_test = pd.DataFrame(rows)\nvalid = (\n    mf_test[\"Mann-Whitney p\"].notna()\n    if \"Mann-Whitney p\" in mf_test\n    else pd.Series(False, index=mf_test.index)\n)\nif valid.any():\n    mf_test.loc[valid, \"FDR q\"] = multipletests(\n        mf_test.loc[valid, \"Mann-Whitney p\"], method=\"fdr_bh\"\n    )[1]\n    mf_test[\"Anlamlı (q<0,05)\"] = np.where(mf_test[\"FDR q\"].notna(), mf_test[\"FDR q\"] < 0.05, None)\nmf_test"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "",
+      "Pazar",
+      "Olay n",
+      "Kontrol n",
+      "Olay medyan Δ",
+      "Kontrol medyan Δ",
+      "Mann-Whitney p",
+      "Welch p",
+      "Cliff δ",
+      "Sonuç",
+      "FDR q",
+      "Anlamlı (q<0,05)"
+     ],
+     "rows": [
+      [
+       "0",
+       "A Pazarı",
+       "71",
+       "1159",
+       "-0.217",
+       "0.010",
+       "3.068583e-12",
+       "0.000514",
+       "-0.493",
+       "NaN",
+       "9.205748e-12",
+       "True"
+      ],
+      [
+       "1",
+       "B Pazarı",
+       "12",
+       "379",
+       "-0.187",
+       "0.007",
+       "7.704658e-02",
+       "0.050216",
+       "-0.300",
+       "NaN",
+       "1.155699e-01",
+       "False"
+      ],
+      [
+       "2",
+       "C Pazarı",
+       "0",
+       "101",
+       "NaN",
+       "NaN",
+       "NaN",
+       "NaN",
+       "NaN",
+       "test edilemedi (yetersiz events)",
+       "NaN",
+       "None"
+      ],
+      [
+       "3",
+       "D Pazarı",
+       "6",
+       "55",
+       "-0.205",
+       "-0.055",
+       "8.041863e-01",
+       "0.343209",
+       "0.067",
+       "NaN",
+       "8.041863e-01",
+       "False"
+      ]
+     ]
+    },
+    {
+     "type": "code",
+     "source": "fig, axis = plt.subplots(figsize=(11, 4.5))\npositions, labels = [], []\nfor i, market in enumerate(MARKETS):\n    g = events[events.pazar == market]\n    o = g[g.yuksek_mf].delta.to_numpy()\n    k = g[~g.yuksek_mf].delta.to_numpy()\n    if len(k):\n        axis.boxplot(\n            [k],\n            positions=[i * 3],\n            widths=0.8,\n            showfliers=False,\n            patch_artist=True,\n            boxprops=dict(facecolor=\"#c7c7c7\"),\n        )\n    if len(o):\n        axis.boxplot(\n            [o],\n            positions=[i * 3 + 1],\n            widths=0.8,\n            showfliers=False,\n            patch_artist=True,\n            boxprops=dict(facecolor=MARKET_COLORS[market]),\n        )\n    positions.append(i * 3 + 0.5)\n    labels.append(f\"{market}\\n(n={len(o)} events)\")\naxis.set_xticks(positions, labels)\naxis.axhline(0, color=\"#666666\", linewidth=1)\naxis.set_ylabel(\"Δ = bir sonraki ay değişimi\")\naxis.set_title(\"Yüksek MF (renkli) vs normal ay (gri) — sonraki ay satış değişimi\")\nfig.tight_layout()\nsave_figure(fig, \"a4_mf_etkisi\")\nplt.show()"
+    },
+    {
+     "type": "figure",
+     "src": "/analiz/figur-06.png",
+     "alt": "<Figure size 1210x495 with 1 Axes>"
+    },
+    {
+     "type": "narrative",
+     "markdown": "#### Teknik yorum\n\n**A Pazarı'nda etki net ve istatistiksel olarak anlamlı, ama işaret beklenenin\ntersi.** 71 olay karşısında 1.159 kontrol ayı: yüksek MF ayını izleyen ayda medyan\ndeğişim **−%21,7**, normal ayları izleyen ayda ise +%1,0. Mann-Whitney\np ≈ 3×10⁻¹², FDR düzeltmesinden sonra q ≈ 9×10⁻¹². Cliff's δ = −0,49, yani\norta-büyük bir etki. İki test de (dağılım varsayımsız ve parametrik) aynı yöne\nişaret ediyor.\n\nDiğer üç pazarda **anlamlı sonuç yok**: B Pazarı'nda 12 olayla q ≈ 0,12,\nD Pazarı'nda 6 olayla q ≈ 0,80. C Pazarı'nda Şirket 1 hiçbir ayda %10 üzeri MF\nkullanmamış, dolayısıyla test edilecek olay yok — bu satır \"test edilemedi\" olarak\nraporlanıyor, sıfır etki olarak değil.\n\n⚠️ Ortalama yerine **medyan** raporlanıyor: D Pazarı'nda ortalama Δ 7,6 çıkıyor ama\nbu, paydası çok küçük birkaç aydan kaynaklanan bir artefakt. Küçük hacimli serilerde\noransal değişim patlıyor.\n\n⚠️ Bu bir **korelasyon** bulgusudur, nedensellik değil. Yüksek MF'in kendisi satışı\ndüşürüyor olabileceği gibi, satışın zaten düşeceği aylarda MF artırılıyor da olabilir.\nCase \"istatistiksel olarak anlamlı\" diyor, \"nedensel etki\" demiyor.\n\n#### İş yorumu\n\nA Pazarı'ndaki bulgu klasik **kanal doldurma (pull-forward)** örüntüsü: yüksek mal\nfazlası verildiği ay kanal doluyor, ertesi ay sipariş düşüyor. Yani MF talep\nyaratmıyor, talebi öne çekiyor. Bu, promosyonun maliyetini (A6'daki TL kaybı) ek bir\nhacim getirisiyle karşılamadığı anlamına gelir.\n\nAksiyon: A Pazarı'nda yüksek MF kampanyaları **iki aylık pencerede** değerlendirilmeli;\ntek ayın satış rakamına bakarak \"kampanya işe yaradı\" demek yanıltıcı. B ve D\npazarlarında olay sayısı karar vermek için yetersiz — burada önce daha fazla veri\ntoplanmalı."
+    }
+   ]
+  },
+  {
+   "id": "a5-sirket-1-ile-sirket-2-nin-karsilastirmasi",
+   "title": "A5 — Şirket 1 ile Şirket 2'nin karşılaştırması",
+   "blocks": [
+    {
+     "type": "narrative",
+     "markdown": "---\n\nÜç ayrı kanıt hattı: (1) yıllık büyüme, (2) rekabet yoğunluğu, (3) \"Diğer Şirket\nhacim kaybediyor mu?\" sorusunun **veriyle sınanması** — iddia edilmesi değil."
+    },
+    {
+     "type": "code",
+     "source": "growth = yoy_growth(df)\ngrowth = growth[growth.sirket.isin([\"Şirket 1\", \"Şirket 2\"]) & growth.yil.between(2017, 2025)]\n\nfig, axes = plt.subplots(2, 2, figsize=(13, 6.5), sharex=True)\nfor axis, market in zip(axes.ravel(), MARKETS, strict=True):\n    g = growth[growth.pazar == market]\n    for company in [\"Şirket 1\", \"Şirket 2\"]:\n        h = g[g.sirket == company]\n        axis.plot(\n            h.yil,\n            h.buyume,\n            marker=\"o\",\n            markersize=3.5,\n            label=company,\n            color=COMPANY_COLORS[company],\n        )\n    axis.axhline(0, color=\"#999999\", linewidth=1)\n    axis.set_title(market)\n    axis.set_ylabel(\"Yıllık büyüme (%)\")\naxes[0, 0].legend(fontsize=8)\nfig.suptitle(\"Yıllık Brüt Kutu büyümesi: Şirket 1 vs Şirket 2\", fontsize=13)\nfig.tight_layout()\nsave_figure(fig, \"a5_yillik_buyume\")\nplt.show()"
+    },
+    {
+     "type": "figure",
+     "src": "/analiz/figur-07.png",
+     "alt": "<Figure size 1430x715 with 4 Axes>"
+    },
+    {
+     "type": "code",
+     "source": "# Kanıt 1: Diğer Şirket'in MUTLAK hacim trendi — doğrusal regresyon eğimi ve p-değeri.\nrows = []\nfor market, g in df[df.sirket == \"Diğer Şirket\"].groupby(\"pazar\", observed=True):\n    monthly = g.groupby(\"tarih\", observed=True).brut_kutu.sum().sort_index()\n    outcome = stats.linregress(np.arange(len(monthly)), monthly.to_numpy())\n    rows.append(\n        {\n            \"Pazar\": market,\n            \"Eğim (kutu/ay)\": round(outcome.slope, 0),\n            \"p\": outcome.pvalue,\n            \"R²\": round(outcome.rvalue**2, 3),\n            \"Yön\": \"artıyor\" if outcome.slope > 0 else \"azalıyor\",\n            \"Anlamlı (p<0,05)\": outcome.pvalue < 0.05,\n        }\n    )\nother_trend = pd.DataFrame(rows)\nother_trend"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "",
+      "Pazar",
+      "Eğim (kutu/ay)",
+      "p",
+      "R²",
+      "Yön",
+      "Anlamlı (p<0,05)"
+     ],
+     "rows": [
+      [
+       "0",
+       "A Pazarı",
+       "-551.0",
+       "4.590958e-01",
+       "0.005",
+       "azalıyor",
+       "False"
+      ],
+      [
+       "1",
+       "B Pazarı",
+       "435.0",
+       "5.480062e-02",
+       "0.030",
+       "artıyor",
+       "False"
+      ],
+      [
+       "2",
+       "C Pazarı",
+       "6066.0",
+       "1.599667e-15",
+       "0.407",
+       "artıyor",
+       "True"
+      ],
+      [
+       "3",
+       "D Pazarı",
+       "17863.0",
+       "2.603654e-03",
+       "0.072",
+       "artıyor",
+       "True"
+      ]
+     ]
+    },
+    {
+     "type": "code",
+     "source": "# Kanıt 2 ve 3: pay değişimi ve tutarlılık kontrolü.\n# Bir şirketin o yıl pazarda hiç bulunmaması payının 0 olması demektir — bu yüzden\n# eksik değerler 0 ile dolduruluyor. Doldurulmazsa üç şirketin pay değişimi toplamı\n# sıfır çıkmıyor (C ve D pazarlarında Şirket 1 2016'da henüz yok).\nfirst_year_share = (\n    market_share(df)[lambda t: t.tarih.dt.year == 2016]\n    .groupby([\"pazar\", \"sirket\"], observed=True)\n    .pay.mean()\n)\nlast_year_share = (\n    market_share(df)[lambda t: t.tarih >= t.tarih.max() - pd.DateOffset(months=11)]\n    .groupby([\"pazar\", \"sirket\"], observed=True)\n    .pay.mean()\n)\nshare_change = (\n    last_year_share.unstack().fillna(0.0) - first_year_share.unstack().fillna(0.0)\n).round(2)\nshare_change[\"Toplam (≈0 olmalı)\"] = share_change.sum(axis=1).round(6)\nshare_change"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "pazar",
+      "",
+      "",
+      "",
+      ""
+     ],
+     "rows": [
+      [
+       "A Pazarı",
+       "-12.17",
+       "5.91",
+       "6.27",
+       "0.01"
+      ],
+      [
+       "B Pazarı",
+       "4.21",
+       "3.22",
+       "-7.43",
+       "0.00"
+      ],
+      [
+       "C Pazarı",
+       "-1.75",
+       "6.07",
+       "-4.32",
+       "0.00"
+      ],
+      [
+       "D Pazarı",
+       "-14.15",
+       "4.04",
+       "10.11",
+       "0.00"
+      ]
+     ]
+    },
+    {
+     "type": "narrative",
+     "markdown": "#### Teknik yorum\n\n🚨 **Case'in \"Diğer Şirket hacim kaybediyor\" varsayımı mutlak hacimde doğrulanmıyor.**\nRegresyon tablosu bunu açıkça gösteriyor: C Pazarı'nda +6.066 kutu/ay (p ≈ 1,6×10⁻¹⁵)\nve D Pazarı'nda +17.863 kutu/ay (p ≈ 0,003) ile **anlamlı biçimde artıyor**.\nA Pazarı'nda eğim negatif ama anlamsız (p = 0,46, R² = 0,005) — yani orada da mutlak\nbir kayıp kanıtlanamıyor.\n\nKayıp **pay** düzeyinde gerçek: A Pazarı'nda Diğer Şirket 12,2 puan, D Pazarı'nda\n14,2 puan kaybetmiş. Yani pazarlar büyüyor, Diğer Şirket de büyüyor ama pazardan\n**daha yavaş**. İki ifade birbirinin yerine kullanılamaz ve karıştırıldığında yanlış\nstratejik sonuç üretir.\n\nPayın kime gittiği tutarlılık kontrolüyle doğrulanıyor: her pazarda üç şirketin pay\ndeğişimi toplamı **0**. A Pazarı'nda Diğer Şirket'in kaybettiği 12,2 puanı\nŞirket 1 (+5,9) ve Şirket 2 (+6,3) neredeyse eşit paylaşmış. D Pazarı'ndaki 14,2\npuanın büyük kısmını (+10,1) Şirket 2 almış.\n\n⚠️ Pay hesabında eksik değerler 0 ile dolduruldu: bir şirketin o yıl pazarda hiç\nbulunmaması \"veri yok\" değil, \"payı %0\" demektir. Doldurulmasaydı C ve D'de toplam\nsıfır çıkmaz, tutarlılık kontrolü sahte biçimde başarısız görünürdü.\n\n#### İş yorumu\n\nA Pazarı Şirket 1 için en başarılı hikâye: on yılda 5,9 puan pay kazanmış ve bunu\ndoğrudan pazar liderinden değil, dağınık rekabetten almış. D Pazarı ise uyarı\nişareti — orada da pay boşalmış ama boşluğu **Şirket 2 kapmış**, Şirket 1 değil.\nD'de rakip daha agresif davranmış.\n\nRekabet yoğunluğu (A2'deki HHI) dört pazarda da düşüyor, yani pazarlar\nparçalanıyor. Bu Şirket 1 gibi küçük paylı bir oyuncu için fırsat: liderin\nkonumu zayıflıyor."
+    }
+   ]
+  },
+  {
+   "id": "a6-birim-fiyat-trendi-ve-promosyonun-maliyeti",
+   "title": "A6 — Birim fiyat trendi ve promosyonun maliyeti",
+   "blocks": [
+    {
+     "type": "narrative",
+     "markdown": "---\n\n`Birim Fiyat = Net TL / Net Kutu`, `Net Kutu = Brüt Kutu × (1 − MF Oran)`.\nBu bölümün tamamı MF ölçek düzeltmesine bağlı — düzeltme olmadan B Pazarı'nda\nbirim fiyat negatif çıkıyor ve tablo anlamsız oluyor."
+    },
+    {
+     "type": "code",
+     "source": "company_one_price = company_one.copy()\ncompany_one_price[\"yil\"] = company_one_price.tarih.dt.year\nyearly_price = (\n    company_one_price[company_one_price.birim_fiyat.notna()]\n    .groupby([\"pazar\", \"yil\"], observed=True)\n    .birim_fiyat.median()\n    .unstack(0)\n)\n\nfig, axis = plt.subplots(figsize=(11, 4.5))\nfor market in MARKETS:\n    if market in yearly_price.columns:\n        axis.plot(\n            yearly_price.index,\n            yearly_price[market],\n            marker=\"o\",\n            markersize=4,\n            label=market,\n            color=MARKET_COLORS[market],\n        )\naxis.set_yscale(\"log\")\naxis.set_ylabel(\"Birim fiyat (TL, log ölçek)\")\naxis.set_xlabel(\"Yıl\")\naxis.set_title(\"Birim fiyat trendi — Şirket 1 (yıllık medyan)\")\naxis.legend()\nfig.tight_layout()\nsave_figure(fig, \"a6_birim_fiyat\")\nplt.show()\n\nyearly_price.round(2)"
+    },
+    {
+     "type": "figure",
+     "src": "/analiz/figur-08.png",
+     "alt": "<Figure size 1210x495 with 1 Axes>"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "yil",
+      "",
+      "",
+      "",
+      ""
+     ],
+     "rows": [
+      [
+       "2016",
+       "8.18",
+       "8.56",
+       "NaN",
+       "NaN"
+      ],
+      [
+       "2017",
+       "9.04",
+       "10.28",
+       "10.97",
+       "NaN"
+      ],
+      [
+       "2018",
+       "10.62",
+       "11.89",
+       "11.74",
+       "NaN"
+      ],
+      [
+       "2019",
+       "13.13",
+       "15.97",
+       "15.60",
+       "NaN"
+      ],
+      [
+       "2020",
+       "14.71",
+       "16.39",
+       "17.49",
+       "NaN"
+      ],
+      [
+       "2021",
+       "17.65",
+       "19.71",
+       "20.98",
+       "8.70"
+      ],
+      [
+       "2022",
+       "30.31",
+       "36.89",
+       "33.45",
+       "13.34"
+      ],
+      [
+       "2023",
+       "57.36",
+       "58.19",
+       "53.96",
+       "25.01"
+      ],
+      [
+       "2024",
+       "74.75",
+       "77.66",
+       "88.01",
+       "38.51"
+      ],
+      [
+       "2025",
+       "86.76",
+       "105.54",
+       "108.68",
+       "47.01"
+      ],
+      [
+       "2026",
+       "112.80",
+       "139.12",
+       "130.91",
+       "75.88"
+      ]
+     ]
+    },
+    {
+     "type": "code",
+     "source": "# Pazarlar arası fiyat farkı — aynı ürün birden fazla pazarda olmadığı için\n# karşılaştırma pazar seviyesinde yapılıyor (A3'teki aynı veri gerçeği).\nlast_year = company_one_price[\n    (company_one_price.yil == 2025) & company_one_price.birim_fiyat.notna()\n]\nprice_summary = last_year.groupby(\"pazar\", observed=True).birim_fiyat.agg(\n    [\"median\", \"std\", \"count\"]\n)\nprice_summary[\"CV\"] = (price_summary[\"std\"] / price_summary[\"median\"]).round(3)\nprice_summary.round(2)"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "pazar",
+      "",
+      "",
+      "",
+      ""
+     ],
+     "rows": [
+      [
+       "A Pazarı",
+       "86.76",
+       "39.76",
+       "120",
+       "0.46"
+      ],
+      [
+       "B Pazarı",
+       "105.54",
+       "50.22",
+       "47",
+       "0.48"
+      ],
+      [
+       "C Pazarı",
+       "108.68",
+       "0.00",
+       "12",
+       "0.00"
+      ],
+      [
+       "D Pazarı",
+       "47.01",
+       "11.34",
+       "19",
+       "0.24"
+      ]
+     ]
+    },
+    {
+     "type": "code",
+     "source": "# Promosyonun TL karşılığı: bedava verilen kutular × birim fiyat.\nloss = promo_revenue_loss(company_one_price)\nyearly_loss = loss.groupby([\"yil\", \"pazar\"], observed=True).gelir_kaybi_tl.sum().unstack() / 1e6\n\nfig, axis = plt.subplots(figsize=(11, 4.5))\nbottom = np.zeros(len(yearly_loss))\nfor market in MARKETS:\n    if market in yearly_loss.columns:\n        value = yearly_loss[market].fillna(0.0).to_numpy()\n        axis.bar(yearly_loss.index, value, bottom=bottom, label=market, color=MARKET_COLORS[market])\n        bottom = bottom + value\naxis.set_ylabel(\"Gelir kaybı (milyon TL)\")\naxis.set_xlabel(\"Yıl\")\naxis.set_title(\"Mal fazlasının yıllık TL karşılığı — Şirket 1\")\naxis.legend()\nfig.tight_layout()\nsave_figure(fig, \"a6_promosyon_maliyeti\")\nplt.show()\n\nyearly_loss.round(1)"
+    },
+    {
+     "type": "figure",
+     "src": "/analiz/figur-09.png",
+     "alt": "<Figure size 1210x495 with 1 Axes>"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "yil",
+      "",
+      "",
+      "",
+      ""
+     ],
+     "rows": [
+      [
+       "2016",
+       "0.8",
+       "0.4",
+       "NaN",
+       "NaN"
+      ],
+      [
+       "2017",
+       "0.9",
+       "0.4",
+       "0.0",
+       "NaN"
+      ],
+      [
+       "2018",
+       "1.1",
+       "0.4",
+       "0.0",
+       "NaN"
+      ],
+      [
+       "2019",
+       "1.4",
+       "0.4",
+       "0.0",
+       "NaN"
+      ],
+      [
+       "2020",
+       "2.3",
+       "0.3",
+       "0.3",
+       "NaN"
+      ],
+      [
+       "2021",
+       "3.9",
+       "0.8",
+       "0.4",
+       "0.1"
+      ],
+      [
+       "2022",
+       "6.7",
+       "1.1",
+       "0.0",
+       "0.9"
+      ],
+      [
+       "2023",
+       "11.4",
+       "3.3",
+       "0.1",
+       "0.7"
+      ],
+      [
+       "2024",
+       "17.7",
+       "4.5",
+       "0.0",
+       "1.7"
+      ],
+      [
+       "2025",
+       "23.0",
+       "6.0",
+       "0.1",
+       "2.2"
+      ],
+      [
+       "2026",
+       "10.8",
+       "2.6",
+       "0.1",
+       "1.5"
+      ]
+     ]
+    },
+    {
+     "type": "code",
+     "source": "total_loss = loss.gelir_kaybi_tl.sum()\ntotal_revenue = company_one_price.net_tl.sum()\nprint(f\"Toplam promosyon gelir kaybı (2016–2026): {tr_number(total_loss / 1e6, 1)} milyon TL\")\nprint(f\"Aynı dönemde toplam Net TL:              {tr_number(total_revenue / 1e6, 1)} milyon TL\")\nprint(f\"Cironun yüzdesi olarak promosyon:        %{tr_number(100 * total_loss / total_revenue, 2)}\")"
+    },
+    {
+     "type": "stream",
+     "text": "Toplam promosyon gelir kaybı (2016–2026): 108,3 milyon TL\nAynı dönemde toplam Net TL:              3.695,3 milyon TL\nCironun yüzdesi olarak promosyon:        %2,93"
+    },
+    {
+     "type": "narrative",
+     "markdown": "#### Teknik yorum\n\nBirim fiyat on yılda dört pazarda da yaklaşık **on katına** çıkmış: A'da 8,2 → 86,8 TL,\nB'de 8,6 → 105,5 TL (2016 → 2025 medyan). Bu büyüklük TL enflasyonuyla tutarlı ve aynı\nzamanda MF ölçek düzeltmesinin doğruluğunun bağımsız bir kontrolü: düzeltme yanlış\nolsaydı B Pazarı bu bandın tamamen dışına düşerdi.\n\n**D Pazarı belirgin biçimde ucuz:** 2025 medyanı 47,0 TL, diğer üç pazarın yarısı\nkadar. A1'deki \"D'de hacim yüksek, ciro düşük\" gözleminin sayısal karşılığı bu.\n\nPromosyonun on yıllık toplam maliyeti **108,3 milyon TL**, aynı dönem cirosunun\nyaklaşık **%2,9'u**. Yük ağırlıkla A Pazarı'nda ve son yıllarda hızla artıyor\n(2016'da 0,8 milyon TL, 2025'te 23,0 milyon TL).\n\n⚠️ **Sınırlılık:** veri setinde TÜFE yok, dolayısıyla bütün fiyat trendleri\n**nominal**. Reel fiyat artışı bundan belirgin biçimde düşük olacaktır; \"fiyatlar on\nkat arttı\" ifadesi enflasyon düzeltmesi yapılmadan bir kârlılık kanıtı değildir.\n\n#### İş yorumu\n\nA4 ile birlikte okunduğunda promosyon politikası sorunlu görünüyor: A Pazarı'nda\nyüksek MF ayını izleyen ay satış medyanda %21,7 düşüyor (yani ek talep yaratılmıyor,\ntalep öne çekiliyor) ve bunun bedeli yılda 23 milyon TL'ye ulaşmış durumda. Bu iki\nbulgu birlikte **promosyon bütçesinin geri dönüşünü sorgulamak için yeterli**.\n\nSomut öneri: A Pazarı'nda MF oranını kademeli olarak düşüren bir pilot çalışma —\netkisi tek ayda değil, iki aylık pencerede ölçülmeli. D Pazarı'nda ise sorun\npromosyon değil fiyat konumlandırması; oradaki düşük birim fiyat, pazarın kendisinin\nmi ucuz olduğu yoksa Şirket 1'in mi ucuza sattığı sorusunu gerektiriyor."
+    }
+   ]
+  },
+  {
+   "id": "a7-bir-sonraki-ay-talep-tahmini",
+   "title": "A7 — Bir sonraki ay talep tahmini",
+   "blocks": [
+    {
+     "type": "narrative",
+     "markdown": "---\n\n**Hedef:** Şirket 1'in her ürün-pazar serisi için t+1 ayının `Brüt Kutu` değeri.\n\n**Değerlendirme:** genişleyen pencereli **walk-forward**, son 12 ay, her adımda bir ay\nileri. Zaman serisinde tek bir train/test bölmesi yanıltıcıdır — tek bir aya denk\ngelen şans model sıralamasını değiştirebilir. Beş model **aynı katmanlarda**\nkarşılaştırılıyor.\n\n| Model | Tanım |\n|---|---|\n| `naive` | ŷ(t+1) = y(t) |\n| `snaive` | ŷ(t+1) = y(t−11) — mevsimsel taban çizgisi |\n| `ma3` | son üç ayın ortalaması |\n| `lgbm` | global LightGBM (tüm seriler tek modelde), MF özellikleriyle |\n| `lgbm_no_mf` | aynı model, MF özellikleri çıkarılmış → **ablasyon** |"
+    },
+    {
+     "type": "code",
+     "source": "import time\n\nstarted = time.perf_counter()\npredictions = {\n    \"naive\": walk_forward(company_one, naive),\n    \"snaive\": walk_forward(company_one, snaive),\n    \"ma3\": walk_forward(company_one, ma3),\n    \"lgbm\": lgbm_walk_forward(company_one, with_mf=True),\n    \"lgbm_no_mf\": lgbm_walk_forward(company_one, with_mf=False),\n}\nelapsed = time.perf_counter() - started\n\n# Ablasyonun adil olması için iki modelin aynı hedef aylarda değerlendirildiğini doğrula.\nkey_columns = [\"pazar\", \"urun\", \"tarih\"]\nassert predictions[\"lgbm\"][key_columns].equals(predictions[\"lgbm_no_mf\"][key_columns])\n\nprint(f\"Beş model {len(predictions['naive'])} tahmin üzerinde değerlendirildi ({elapsed:.1f} sn).\")"
+    },
+    {
+     "type": "stream",
+     "text": "Beş model 209 tahmin üzerinde değerlendirildi (15.5 sn)."
+    },
+    {
+     "type": "code",
+     "source": "tables = []\nfor name, outcome in predictions.items():\n    m = metrics_by_market(outcome)\n    m.insert(0, \"model\", name)\n    tables.append(m)\nmetric_table = pd.concat(tables, ignore_index=True)\n\n# Case'in istediği tablo: model × pazar → MAE, MAPE, RMSE (+ sıfır-dayanıklı WAPE).\nmetric_table.pivot_table(\n    index=\"pazar\", columns=\"model\", values=[\"mae\", \"mape\", \"rmse\", \"wape\"]\n).round(1)"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "pazar",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     "rows": [
+      [
+       "A Pazarı",
+       "10006.7",
+       "11268.0",
+       "11767.2",
+       "16411.2",
+       "9503.1",
+       "13.1",
+       "15.1",
+       "16.7",
+       "22.2",
+       "17.3",
+       "21854.9",
+       "24728.5",
+       "22348.4",
+       "30899.2",
+       "16420.1",
+       "17.8",
+       "20.0",
+       "20.9",
+       "29.2",
+       "16.9"
+      ],
+      [
+       "B Pazarı",
+       "1798.0",
+       "1986.2",
+       "1653.1",
+       "2015.2",
+       "3071.6",
+       "25.4",
+       "39.6",
+       "62.1",
+       "62.7",
+       "101.7",
+       "3201.5",
+       "3677.1",
+       "2934.1",
+       "3119.8",
+       "5561.9",
+       "11.7",
+       "12.9",
+       "10.8",
+       "13.1",
+       "20.0"
+      ],
+      [
+       "C Pazarı",
+       "22376.8",
+       "17033.4",
+       "11884.0",
+       "12502.8",
+       "19324.0",
+       "18.9",
+       "14.7",
+       "10.6",
+       "11.2",
+       "15.7",
+       "35507.6",
+       "28256.1",
+       "21129.2",
+       "21853.7",
+       "35471.8",
+       "18.7",
+       "14.2",
+       "9.9",
+       "10.4",
+       "16.1"
+      ],
+      [
+       "D Pazarı",
+       "67105.5",
+       "79508.1",
+       "67714.0",
+       "70916.0",
+       "247325.1",
+       "2067.9",
+       "3528.7",
+       "30515.4",
+       "1602.3",
+       "4257901.7",
+       "106959.0",
+       "131060.4",
+       "89990.5",
+       "111232.0",
+       "296346.1",
+       "52.9",
+       "62.7",
+       "53.4",
+       "55.9",
+       "195.0"
+      ]
+     ]
+    },
+    {
+     "type": "code",
+     "source": "# WAPE tek başına — model seçimi bu tablodan okunur.\nwape_table = metric_table.pivot_table(index=\"pazar\", columns=\"model\", values=\"wape\").round(1)\nwape_table[\"En iyi model\"] = wape_table.idxmin(axis=1)\nwape_table"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "pazar",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     "rows": [
+      [
+       "A Pazarı",
+       "17.8",
+       "20.0",
+       "20.9",
+       "29.2",
+       "16.9",
+       "snaive"
+      ],
+      [
+       "B Pazarı",
+       "11.7",
+       "12.9",
+       "10.8",
+       "13.1",
+       "20.0",
+       "ma3"
+      ],
+      [
+       "C Pazarı",
+       "18.7",
+       "14.2",
+       "9.9",
+       "10.4",
+       "16.1",
+       "ma3"
+      ],
+      [
+       "D Pazarı",
+       "52.9",
+       "62.7",
+       "53.4",
+       "55.9",
+       "195.0",
+       "lgbm"
+      ]
+     ]
+    },
+    {
+     "type": "narrative",
+     "markdown": "🚨 **MAPE'nin neden tek başına kullanılamayacağı yukarıdaki tabloda görülüyor:**\nD Pazarı'nda `snaive` için MAPE **4.257.901** çıkıyor. Sebep sıfıra yakın gerçek\ndeğerler — küçük hacimli aylarda oransal hata patlıyor. Aynı satırda WAPE 195,0 ve\nbu okunabilir bir sayı. Case MAPE istediği için tabloda duruyor, ama model seçimi\n**WAPE** üzerinden yapılıyor."
+    },
+    {
+     "type": "code",
+     "source": "# MF ablasyonu: MF özellikleri tahmin gücünü artırıyor mu?\nablation = wape_table[[\"lgbm\", \"lgbm_no_mf\"]].copy()\nablation[\"WAPE farkı (puan)\"] = (ablation.lgbm_no_mf - ablation.lgbm).round(1)\nablation[\"MF katkısı\"] = np.where(\n    ablation[\"WAPE farkı (puan)\"] > 0, \"iyileştiriyor\", \"iyileştirmiyor\"\n)\nablation"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "pazar",
+      "",
+      "",
+      "",
+      ""
+     ],
+     "rows": [
+      [
+       "A Pazarı",
+       "17.8",
+       "20.0",
+       "2.2",
+       "iyileştiriyor"
+      ],
+      [
+       "B Pazarı",
+       "11.7",
+       "12.9",
+       "1.2",
+       "iyileştiriyor"
+      ],
+      [
+       "C Pazarı",
+       "18.7",
+       "14.2",
+       "-4.5",
+       "iyileştirmiyor"
+      ],
+      [
+       "D Pazarı",
+       "52.9",
+       "62.7",
+       "9.8",
+       "iyileştiriyor"
+      ]
+     ]
+    },
+    {
+     "type": "code",
+     "source": "# Mevsimsellik gücüne göre model sıralaması: aynı mimari her seride geçerli mi?\nstrength_map = {\n    (row[\"Pazar\"], row[\"Ürün\"]): row[\"Mevsimsellik gücü\"] for _, row in seasonality.iterrows()\n}\nrows = []\nfor name, outcome in predictions.items():\n    labelled = outcome.copy()\n    labelled[\"guc\"] = [\n        strength_map.get((p, u)) for p, u in zip(labelled.pazar, labelled.urun, strict=True)\n    ]\n    labelled = labelled[labelled.guc.notna()]\n    split = np.where(labelled.guc >= 0.30, \"güçlü (≥0,30)\", \"zayıf (<0,30)\")\n    for label_, bottom in labelled.groupby(split):\n        rows.append(\n            {\n                \"model\": name,\n                \"Mevsimsellik\": label_,\n                \"WAPE\": round(\n                    100 * (bottom.gercek - bottom.tahmin).abs().sum() / bottom.gercek.sum(), 1\n                ),\n            }\n        )\npd.DataFrame(rows).pivot_table(index=\"Mevsimsellik\", columns=\"model\", values=\"WAPE\")"
+    },
+    {
+     "type": "table",
+     "headers": [
+      "Mevsimsellik",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     "rows": [
+      [
+       "güçlü (≥0,30)",
+       "20.2",
+       "22.0",
+       "23.3",
+       "32.7",
+       "17.5"
+      ],
+      [
+       "zayıf (<0,30)",
+       "19.5",
+       "20.2",
+       "21.8",
+       "17.6",
+       "70.4"
+      ]
+     ]
+    },
+    {
+     "type": "code",
+     "source": "# Gerçek vs tahmin — her pazardan bir temsili seri.\nsample_series = [\n    (\"A Pazarı\", \"Ürün-G\"),\n    (\"B Pazarı\", \"Ürün-FR\"),\n    (\"C Pazarı\", \"Ürün 2\"),\n    (\"D Pazarı\", \"Ürün 77\"),\n]\n\n\ndef _one_series(frame, market, product):\n    return frame[(frame.pazar == market) & (frame.urun == product)].sort_values(\"tarih\")\n\n\nfig, axes = plt.subplots(2, 2, figsize=(13, 6.5))\nfor axis, (market, product) in zip(axes.ravel(), sample_series, strict=True):\n    observed = _one_series(predictions[\"naive\"], market, product)\n    axis.plot(\n        observed.tarih, observed.gercek, marker=\"o\", markersize=4, color=\"#222222\", label=\"gerçek\"\n    )\n    for name, colour in [(\"lgbm\", MARKET_COLORS[market]), (\"naive\", \"#999999\")]:\n        line = _one_series(predictions[name], market, product)\n        axis.plot(\n            line.tarih,\n            line.tahmin,\n            linestyle=\"--\",\n            marker=\"s\",\n            markersize=3,\n            color=colour,\n            label=name,\n        )\n    axis.set_title(f\"{market} / {product}\")\n    axis.tick_params(axis=\"x\", rotation=45)\n    axis.set_ylabel(\"Brüt Kutu\")\naxes[0, 0].legend(fontsize=8)\nfig.suptitle(\"Son 12 ay: gerçek ve tahmin\", fontsize=13)\nfig.tight_layout()\nsave_figure(fig, \"a7_gercek_vs_tahmin\")\nplt.show()"
+    },
+    {
+     "type": "figure",
+     "src": "/analiz/figur-10.png",
+     "alt": "<Figure size 1430x715 with 4 Axes>"
+    },
+    {
+     "type": "code",
+     "source": "# Kısa seri politikası: bunlar tahmin edilmiyor ama global modelin eğitim havuzunda.\npredicted_keys = set(zip(predictions[\"lgbm\"].pazar, predictions[\"lgbm\"].urun, strict=True))\nall_keys = set(zip(company_one.pazar.astype(str), company_one.urun, strict=True))\npd.DataFrame(\n    [\n        {\n            \"Pazar\": p,\n            \"Ürün\": u,\n            \"Satışlı ay\": int(\n                (\n                    company_one[(company_one.pazar == p) & (company_one.urun == u)].brut_kutu > 0\n                ).sum()\n            ),\n            \"Durum\": \"yetersiz geçmiş — tahmin edilmedi\",\n        }\n        for p, u in sorted(all_keys - predicted_keys)\n    ]\n)"
+    },
+    {
+     "type": "table",
+     "headers": [
+      ""
+     ],
+     "rows": []
+    },
+    {
+     "type": "narrative",
+     "markdown": "#### Teknik yorum\n\n🚨 **Case'in \"aynı model mimarisi tüm pazarlarda geçerli mi?\" sorusunun cevabı: hayır.**\nWAPE tablosu dört pazarda **üç farklı kazanan** gösteriyor:\n\n| Pazar | En iyi | WAPE | Neden |\n|---|---|---|---|\n| A | `snaive` | 16,9 | 124 aylık tam geçmiş + A2'de görülen Temmuz zirvesi; mevsimsel taban çizgisi yeterli |\n| B | `ma3` | 10,8 | Mevsimsellik zayıf, seri düzgün; basit yumuşatma en iyisi |\n| C | `ma3` | 9,9 | Tek aktif ürün, düşük varyans |\n| D | `lgbm` | 52,9 | Kısa ve düzensiz seriler; global model diğer pazarlardan öğrenerek fark yaratıyor |\n\n`lgbm` hiçbir pazarda açık ara kazanmıyor ama **hiçbirinde de kötü değil** — A'da\nikinci, B'de ikinci, D'de birinci. Tek bir model seçmek gerekseydi `lgbm` en\nsavunulabilir tercih olurdu; pazar bazında seçim serbestse tabloya uyulmalı.\n\nD Pazarı'nın WAPE'si diğerlerinin üç katı (52,9 vs 10–18). Sebep bulgu §2.5'te:\nD'nin iki serisinden biri 52, diğeri 11 aylık. Kısa ve düzensiz geçmiş tahmin\nedilebilirliği doğrudan düşürüyor.\n\n**MF ablasyonu:** MF özellikleri **dört pazarın üçünde** tahmini iyileştiriyor —\nA'da 2,2, B'de 1,2, D'de 9,8 puan WAPE kazancı. C Pazarı'nda ise **kötüleştiriyor**\n(14,2 → 18,7). Bu tutarlı bir sonuç: A4'te C Pazarı'nda hiç yüksek MF olayı\nbulunmamıştı, yani orada MF sütunu bilgi taşımıyor, yalnız gürültü ekliyor.\nAblasyonun negatif çıktığı yeri gizlemek yerine raporlamak, MF'in **ne zaman**\nişe yaradığını gösteriyor.\n\nMevsimsellik kırılımı aynı hikâyeyi destekliyor: mevsimsellik gücü yüksek serilerde\n`snaive` rekabetçi, zayıf olanlarda tamamen geride kalıyor.\n\n**Kısa seriler gizlenmedi:** `C/Ürün 1` (1 ay) ve `D/Ürün 78` (11 ay) tahmin\ntablosunda yok, ayrı listede \"yetersiz geçmiş\" etiketiyle duruyor. İkisi de global\nLightGBM'in eğitim havuzunda kalıyor — model onlardan da öğreniyor, ama onlar için\nüretilmiş bir sayı raporlanmıyor.\n\n#### İş yorumu\n\nTalep planlaması için tek bir merkezi model dayatmak yerine **pazar bazında model\nseçimi** öneriliyor; tablo bunun 12 aylık geriye dönük testte ölçülmüş dayanağını\nveriyor. A ve B pazarlarında %10–17'lik WAPE, aylık sipariş planlaması için\nkullanılabilir bir doğruluk.\n\nD Pazarı'nda %53'lük hata ile otomatik planlama yapılmamalı; oradaki iki ürün için\nmanuel gözden geçirme gerekiyor ve asıl çözüm daha uzun geçmiş biriktirmek.\n\nMF verisinin tahmine katkısı, promosyon takviminin planlama sistemine **girdi olarak\nbağlanması** gerektiğini gösteriyor: kampanya kararı önceden biliniyorsa bir sonraki\nayın tahmini de düzeliyor."
+    }
+   ]
+  }
+ ],
+ "figureCount": 10
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { groupByDate } from "@/lib/storage";
@@ -135,6 +136,15 @@ export default function Sidebar({
       </div>
 
       <div className="flex flex-col gap-1 border-t border-[var(--border)] p-2">
+        <Link
+          href="/analiz"
+          title="Bölüm 2 analizi"
+          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--text-dim)]
+            transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--text)]
+            ${collapsed ? "justify-center px-0" : ""}`}
+        >
+          📊 {!collapsed && "Satış analizi"}
+        </Link>
         <button
           onClick={onToggleTheme}
           title={dark ? "Açık tema" : "Koyu tema"}

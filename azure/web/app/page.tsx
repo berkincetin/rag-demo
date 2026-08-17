@@ -16,6 +16,7 @@ import ChatPane from "@/components/ChatPane";
 import Composer from "@/components/Composer";
 import Sidebar from "@/components/Sidebar";
 import { STORAGE_KEY } from "@/lib/storage";
+import { applyTheme, readStoredTheme } from "@/lib/theme";
 import { useConversations } from "@/lib/useConversations";
 
 export default function Home() {
@@ -47,16 +48,10 @@ export default function Home() {
 
   // Lazy initializer rather than an effect: reads the stored choice (falling
   // back to the OS preference) once, on mount, without a second render.
-  const [dark, setDark] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    const stored = localStorage.getItem("rag-theme");
-    if (stored) return stored === "dark";
-    return window.matchMedia("(prefers-color-scheme: dark)").matches;
-  });
+  const [dark, setDark] = useState<boolean>(readStoredTheme);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-    localStorage.setItem("rag-theme", dark ? "dark" : "light");
+    applyTheme(dark);
   }, [dark]);
 
   async function handleFiles(files: FileList) {

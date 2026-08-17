@@ -577,6 +577,21 @@ onun ürettiği görseller. Mevcut kodlara dokunulmadı.
 | **Bölümleme notebook'un `## ` başlıklarından çıkıyor** | Ayırıcı markdown hücreleri zaten `## ` ile bölüm açıyordu; ek işaretleme gerekmedi. Çapa kimlikleri Türkçe harfler ASCII'ye indirgenerek üretiliyor — `casefold()` tek başına `İ`'yi iki kod noktasına açıp tarayıcıda eşleşmez kimlik üretirdi |
 | **`public/analiz/` giriş arkasında** | `middleware.ts` matcher'ı `_next/static` dışında her şeyi kapsıyor. İddia varsayılmadı, ölçüldü: anonim istek hem `/analiz` hem `/analiz/figur-01.png` için 307 → `/login` |
 
+### Aşama 3 — Model katalogu ve ayarlar menüsü (2026-08-17)
+
+| Konu | Öğrenilen |
+|---|---|
+| 🚨 **`list-models` kota demek değildir** | Spec altı modeli "hepsi mevcut ve hepsi GlobalStandard" diye listelemişti; `list-models` gerçekten öyle diyor. Ama o komut *katalogda var mı* sorusunu yanıtlıyor, *dağıtabilir miyim* sorusunu değil. eastus'ta `text-embedding-3-large`, `embed-v-4-0`, `Cohere-rerank-v4.0-fast` ve `cohere-command-a` için kota **sıfır**dı; dağıtım denemesi `InsufficientQuota` ile döndü. Doğru komut `az cognitiveservices usage list -l <bölge>`. Dördü de swedencentral/eastus2'de kotalı ama hesap eastus'ta — ikinci hesap mimariyi değiştireceği için kullanıcı kararıyla kapsam dışı bırakıldı |
+| **Üç embedding indeksi ve rerank yapılmadı** | Kota olmadan `text-embedding-3-large` ve `embed-v-4-0` dağıtılamadı; rerank modeli de öyle. Spec'in D ve F bölümleri bu yüzden uygulanmadı. Menü bunları "kota yok" sebebiyle devre dışı gösteriyor |
+| 🚨 **gpt-5-mini ajan döngüsünde tıkanıyor** | Ölçüldü (gerçek korpus, aynı soru): gpt-4.1-mini 2 turda 1 arama yapıp 2 atıflı doğru cevap veriyor; gpt-5-mini **6 turda bile** aynı aramayı tekrarlayıp hiç metin yazmadan bitiyor. Sebep sistem promptu: "Cevap vermeden önce HER ZAMAN search_documents çağırmalısın" talimatını akıl yürütme adımında her turda yeniden değerlendiriyor. Tur sınırını 3→6 çıkarmak çözmedi. Promptu modele göre yeniden yazmak bu aşamanın kapsamı dışında bırakıldı, bulgu `quality_warning` ile menüde gösteriliyor |
+| 🚨 **Phi-4-mini atıf işareti koymuyor** | Doğru kaynağı (`calisan_sss_rehberi.xlsx` satır 4) buluyor ve içeriği alıyor ama cevaba `[1]` koymuyor; atıf kapısı haklı olarak reddediyor. Yani "araç çağırıyor" yeterli değil — atıflı yazabilmesi ayrı bir yetenek |
+| **GPT-5 parametre farkları gerçek** | Sondalanarak doğrulandı: `max_tokens` → HTTP 400 (`max_completion_tokens` isteniyor), `temperature=0` → HTTP 400 (yalnızca varsayılan 1). Bayrak olarak katalogda duruyor, istemcide `if model_id ==` zinciri yok |
+| **Akıl yürütme tokenı bütçeyi yiyor** | gpt-5-mini tek kısa cevapta 128 `reasoning_tokens` harcadı. 1024'lük ortak sınır bırakılsaydı cevap sessizce boş dönebilirdi; bu modelin sınırı 4096 |
+| **Phi için ayrı SDK gerekmedi** | Spec `azure-ai-inference` paketini ve ikinci bir uç adresini öngörüyordu. Ölçüm bunu çürüttü: `Phi-4-mini-instruct` mevcut Azure OpenAI ucundan sorunsuz çalışıyor ve araç çağırıyor. Yeni bağımlılık eklenmedi |
+| 🚨 **Stub'lı testler yanlış öznitelik adını kaçırdı** | `_agent_for` `base.tools` okuyordu ama gerçek alan `base.toolbox`. Tüm API testleri ajanı stub'ladığı için 200 dönüyordu; hata yalnızca gerçek korpusla çalıştırınca ortaya çıktı. Gerçek `Agent` alanlarına bakan bir test yazılıp düzeltildi — stub, stub'ladığı şeyin sözleşmesini doğrulamaz |
+| **Model seçimi indeksi yeniden yüklemiyor** | `_agent_for` yalnızca LLM istemcisini değiştiriyor; retriever, indeks ve araç kutusu modelden bağımsız. Aksi hâlde her istek 276 parçayı diskten yeniden okurdu |
+| **İstek gövdesi tek yerden kuruluyor** | `buildAskBody` model alanını ekliyor. Çağıran taraf `readStoredModel()` çağırıp alanı elle koysaydı, ikinci bir çağrı yeri eklendiğinde sessizce unutulur ve o yol hep varsayılan modelle çalışırdı |
+
 ## 5. Açık Sorular / Bekleyen Kararlar
 
 - **`gemini-3.5-flash` model ID'si doğrulanmadı.** Kullanıcı verdi, katalogda öyle yazıldı;

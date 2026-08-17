@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { buildContext, messagesToSummarize, needsSummarization, SUMMARY_BLOCK } from "./memory";
+import { buildAskBody } from "./settings";
 import { readSseStream } from "./sse";
 import {
   createConversation,
@@ -231,12 +232,14 @@ export function useConversations() {
         const response = await fetch(`${BASE}/api/ask/stream`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            question,
-            conversationId,
-            summary,
-            history: recentMessages.map((m) => ({ role: m.role, content: m.content })),
-          }),
+          body: JSON.stringify(
+            buildAskBody({
+              question,
+              conversationId,
+              summary,
+              history: recentMessages.map((m) => ({ role: m.role, content: m.content })),
+            }),
+          ),
         });
 
         if (!response.ok || !response.body) {

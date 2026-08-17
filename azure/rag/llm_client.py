@@ -10,14 +10,10 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
+from azure.rag.catalog import resolve_chat_model
 from azure.rag.config import AzureConfig
 from azure.rag.models import TokenUsage
 from azure.rag.request_context import emit_token
-
-# Measured in Part 1: at a higher temperature the model intermittently omits
-# the [n] citation marker and the citation gate then rejects a correct answer.
-_TEMPERATURE = 0.0
-_MAX_TOKENS = 1024
 
 
 @dataclass
@@ -41,12 +37,22 @@ class LLMResponse:
 class AzureOpenAIClient:
     """Tool-calling chat client over an Azure OpenAI deployment."""
 
-    def __init__(self, config: AzureConfig | None = None, client: Any = None) -> None:
+    def __init__(
+        self,
+        config: AzureConfig | None = None,
+        client: Any = None,
+        model_id: str | None = None,
+    ) -> None:
         self.config = config or AzureConfig.load()
+        # Selection is resolved against the catalog *before* any request, so an
+        # unknown name can never reach the wire as a deployment name. Raising
+        # here (rather than falling back) is deliberate: a silently substituted
+        # model would answer with something the caller never asked for.
+        self.spec = resolve_chat_model(model_id or self.config.chat_deployment)
         # `agent.py` reads `llm.model` to label metrics and price the run. Without
         # this attribute it falls back to "bilinmiyor", so every recorded run and
         # every cost lookup loses the model identity — measured, not assumed.
-        self.model = self.config.chat_deployment
+        self.model = self.spec.deployment
         self._client = client or self._build_client()
 
     def _build_client(self) -> Any:
@@ -70,10 +76,12 @@ class AzureOpenAIClient:
         """
         payload: dict[str, Any] = {
             # On Azure this is the deployment name, not the model name.
-            "model": self.config.chat_deployment,
+            "model": self.spec.deployment,
             "messages": messages,
-            "temperature": _TEMPERATURE,
-            "max_tokens": _MAX_TOKENS,
+            # Temperature and the token-limit field differ per model and are
+            # measured, not assumed — the gpt-5 family rejects both `max_tokens`
+            # and `temperature=0` outright. See catalog.py for the probe results.
+            **self.spec.payload_limits(),
             "stream": True,
             # Without this the streamed response carries no usage at all and
             # every token count and cost silently becomes null.

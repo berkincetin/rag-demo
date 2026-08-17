@@ -30,9 +30,15 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from azure.rag.build import build_agent
-from azure.rag.catalog import list_models
+from azure.rag.catalog import (
+    DEFAULT_CHAT_MODEL,
+    available_chat_models,
+    list_models,
+    resolve_chat_model,
+)
 from azure.rag.config import AzureConfig
 from azure.rag.embedder import AzureOpenAIEmbedder
+from azure.rag.llm_client import AzureOpenAIClient
 from azure.rag.loaders import UPLOAD_SUFFIXES
 from azure.rag.memory import ConversationMemory
 from azure.rag.metrics import MetricsStore
@@ -98,6 +104,48 @@ def _agent():
     return _AGENT
 
 
+def _agent_for(model_id: str | None = None):
+    """The agent for one request's model choice.
+
+    The default model reuses the singleton, so the common path still loads the
+    index once. A non-default choice swaps only the LLM client: the retriever,
+    the index and the tool box are model-independent, and rebuilding them would
+    re-read 276 chunks from disk on every request.
+    """
+    base = _agent()
+    if not model_id or model_id == DEFAULT_CHAT_MODEL:
+        return base
+
+    from azure.rag.agent import Agent
+
+    return Agent(
+        base.retriever,
+        base.toolbox,
+        AzureOpenAIClient(model_id=model_id),
+        base.max_tool_turns,
+        metrics=base.metrics,
+    )
+
+
+def _validated_model(model_id: str | None) -> str:
+    """Resolve a client-supplied model name, or refuse it with 400.
+
+    Two separate refusals: a name that is not in the catalog at all, and a name
+    that is in the catalog but has no deployment behind it. Both must fail here
+    rather than at the Azure call, where the error would surface as a 500.
+    """
+    try:
+        model = resolve_chat_model(model_id)
+    except KeyError:
+        raise HTTPException(status_code=400, detail="Tanınmayan model.") from None
+    if not model.deployed:
+        raise HTTPException(
+            status_code=400,
+            detail=model.unavailable_reason or "Bu model şu anda kullanılamıyor.",
+        )
+    return model.id
+
+
 def _store() -> MetricsStore:
     return MetricsStore(AzureConfig.load().storage_dir / "metrics.db")
 
@@ -131,6 +179,7 @@ def _check_rate_limit(session_id: str) -> None:
 class AskRequest(BaseModel):
     question: str
     userName: str | None = None
+    modelId: str | None = None
 
 
 @app.post("/api/ask", dependencies=[Depends(require_internal_token)])
@@ -143,11 +192,12 @@ def ask(body: AskRequest, x_session_id: str | None = Header(default=None)):
     if not question:
         raise HTTPException(status_code=400, detail="Soru boş olamaz.")
 
+    model_id = _validated_model(body.modelId)
     set_user_name(session, body.userName or "")
-    answer = _agent().answer(question, memory=get_memory(session), user_name=get_user_name(session))
+    answer = _agent_for(model_id).answer(
+        question, memory=get_memory(session), user_name=get_user_name(session)
+    )
     add_to_transcript(session, question, answer.text)
-
-    model_id = list_models()[0].id
     cost = estimate_cost(model_id, answer.usage.input_tokens, answer.usage.output_tokens)
     payload = answer_payload(answer, cost)
     payload["modelId"] = model_id
@@ -158,6 +208,7 @@ class StreamAskRequest(BaseModel):
     question: str
     userName: str | None = None
     conversationId: str | None = None
+    modelId: str | None = None
     # Client-owned conversation state: the browser holds N conversations per
     # session, so the server cannot key memory by session alone.
     summary: str | None = None
@@ -184,14 +235,14 @@ def _memory_from_client(
     return memory
 
 
-def _answer_for(session_id, conversation_id, question, memory, session):
+def _answer_for(session_id, conversation_id, question, memory, session, model_id=None):
     """Answer, widening retrieval to this conversation's uploads when it has any.
 
     The graph itself is untouched: only the retriever it is built around
     changes. Recompiling the state machine is cheap — the loaded index and the
     LLM client are shared, not rebuilt.
     """
-    agent = _agent()
+    agent = _agent_for(model_id)
     key = _upload_key(session_id, conversation_id or "default")
     if not _UPLOADS.get(key):
         return agent.answer(question, memory=memory, user_name=get_user_name(session))
@@ -224,13 +275,13 @@ def ask_stream(body: StreamAskRequest, x_session_id: str | None = Header(default
     if not question:
         raise HTTPException(status_code=400, detail="Soru boş olamaz.")
 
+    model_id = _validated_model(body.modelId)
     session = _session(session_id)
     set_user_name(session, body.userName or "")
     memory = _memory_from_client(body.summary, body.history)
-    model_id = list_models()[0].id
 
     def run(_emit):
-        answer = _answer_for(session_id, body.conversationId, question, memory, session)
+        answer = _answer_for(session_id, body.conversationId, question, memory, session, model_id)
         return {"text": answer.text, "citations": list(answer.citations), "answer": answer}
 
     def on_meta(result):
@@ -372,7 +423,22 @@ def models():
     available = list_models()
     return {
         "models": [model_payload(model) for model in available],
-        "activeId": available[0].id,
+        "activeId": DEFAULT_CHAT_MODEL,
+        # Catalog entries with no deployment behind them. The menu shows these
+        # disabled with the reason, so a selection never fails silently.
+        "unavailable": [
+            {"id": model.id, "label": model.label, "reason": model.unavailable_reason}
+            for model in available_chat_models()
+            if not model.deployed
+        ],
+        "notes": {model.id: model.note for model in available_chat_models() if model.note},
+        # Dağıtılmış ama ölçümde atıflı cevap üretemeyen modeller. Menü bunu
+        # gösterir; seçenek kaldırılmıyor, ama kalitesi gizlenmiyor da.
+        "warnings": {
+            model.id: model.quality_warning
+            for model in available_chat_models()
+            if model.quality_warning
+        },
     }
 
 

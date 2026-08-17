@@ -16,12 +16,19 @@ from azure.rag.ui_state import (
 # --- catalog -----------------------------------------------------------------
 
 
-def test_catalog_exposes_only_the_azure_model():
+def test_catalog_leads_with_the_calibrated_default():
+    """Sıra menüye yansıyor; ilk sıra Bölüm 1'de kalibre edilen model olmalı."""
     models = list_models()
 
-    assert [model.id for model in models] == [AZURE_MODEL_ID]
-    assert models[0].provider == "azure_openai"
-    assert models[0].local is False
+    assert models[0].id == AZURE_MODEL_ID
+    assert all(model.provider == "azure_openai" for model in models)
+    assert all(model.local is False for model in models)
+
+
+def test_catalog_exposes_every_deployed_alternative():
+    ids = [model.id for model in list_models()]
+
+    assert ids == ["gpt-4.1-mini", "gpt-5-mini", "Phi-4-mini-instruct"]
 
 
 def test_get_model_returns_none_for_a_foreign_model():

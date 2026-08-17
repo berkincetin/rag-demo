@@ -1,8 +1,43 @@
-"""The single model this deployment can use.
+"""Seçilebilir sohbet modelleri ve aralarındaki ölçülmüş farklar.
 
-Unlike src/rag/catalog.py there is no provider choice: the deployment talks to
-one Azure OpenAI deployment, named by configuration. Local models are absent
-entirely — there is no Ollama here.
+Katalog tek doğruluk kaynağıdır: arayüz menüsünü doldurur ve sunucu tarafındaki
+doğrulamayı yapar. İstemciden gelen ad **doğrudan dağıtım adı olarak
+kullanılmaz** — önce buradan geçer, tanınmazsa istek reddedilir.
+
+Modeller arası farklar burada bayrak olarak durur, istemcide `if model_id ==`
+zinciri olarak değil. Bayrakların tamamı 2026-08-17'de canlı uca sondalanarak
+ölçüldü, tahmin edilmedi:
+
+  gpt-5-mini  `max_tokens` → HTTP 400, `max_completion_tokens` isteniyor
+  gpt-5-mini  `temperature=0` → HTTP 400, yalnızca varsayılan (1) kabul ediliyor
+  gpt-5-mini  tek kısa cevapta 128 reasoning token harcadı — 1024'lük bütçe
+              cevabı boş bırakabilirdi, o yüzden sınırı daha yüksek
+  Phi-4-mini  Azure OpenAI ucundan sorunsuz çalışıyor ve araç çağırıyor;
+              spec'in öngördüğü `azure-ai-inference` bağımlılığı gerekmedi
+
+Kotası olmayan modeller listede kalır ama `deployed=False` ve sebebiyle
+işaretlenir — menüde devre dışı görünür, sessizce başarısız olan bir seçenek
+bırakılmaz.
+
+## Ölçülmüş cevap kalitesi (2026-08-17, gerçek korpus, aynı soru)
+
+"Yıllık izin talebimi nasıl yaparım?" üç modele soruldu. Doğru cevap
+`calisan_sss_rehberi.xlsx` satır 4'te ve üçü de o parçayı aldı:
+
+| Model | Tur | Arama | Atıf | Sonuç |
+|---|---|---|---|---|
+| gpt-4.1-mini | 2 | 1 | 2 | doğru cevap |
+| gpt-5-mini | 6* | 6 | 0 | hiç cevap yazmadı |
+| Phi-4-mini-instruct | 2 | 1 | 0 | [n] işareti koymadı |
+
+*Tur sınırı 3'ten 6'ya çıkarıldığında da değişmedi.
+
+`gpt-5-mini`'nin sebebi sistem promptu: "Cevap vermeden önce HER ZAMAN
+search_documents çağırmalısın" talimatını akıl yürütme adımında her turda
+yeniden değerlendirip aramayı tekrarlıyor. `gpt-4.1-mini` aynı talimatı
+"bir kez ara, sonra cevapla" diye okuyor. Promptu bu model için yeniden
+yazmak Aşama 3'ün kapsamı dışında; bulgu gizlenmek yerine `quality_warning`
+ile menüde gösteriliyor.
 """
 
 from dataclasses import dataclass
@@ -10,10 +45,22 @@ from dataclasses import dataclass
 AZURE_MODEL_ID = "gpt-4.1-mini"
 PROVIDER = "azure_openai"
 
+DEFAULT_CHAT_MODEL = AZURE_MODEL_ID
+
+# Bölüm 1'de ölçüldü: daha yüksek sıcaklıkta model [n] atıf işaretini zaman
+# zaman düşürüyor ve atıf kapısı doğru cevabı reddediyor.
+_TEMPERATURE = 0.0
+_MAX_TOKENS = 1024
+
+# eastus'ta kota sıfır olduğu için dağıtılamayan modeller (ölçüldü:
+# `az cognitiveservices usage list -l eastus`). Katalogda kalıyorlar ki menü
+# neden seçilemediklerini söyleyebilsin.
+_NO_QUOTA = "eastus bölgesinde bu model için kota tanımlı değil"
+
 
 @dataclass(frozen=True)
 class ModelInfo:
-    """One selectable model."""
+    """Menüde görünen bir model."""
 
     id: str
     provider: str
@@ -22,14 +69,114 @@ class ModelInfo:
     local: bool = False
 
 
-_MODELS = (ModelInfo(AZURE_MODEL_ID, PROVIDER, "GPT-4.1 mini (Azure)", 128_000),)
+@dataclass(frozen=True)
+class ChatModel:
+    """Bir sohbet modelinin dağıtım adı ve çağrı sözleşmesi."""
+
+    id: str
+    deployment: str
+    label: str
+    note: str = ""
+    deployed: bool = True
+    unavailable_reason: str | None = None
+    context_tokens: int | None = None
+
+    # Ölçülmüş çağrı farkları.
+    max_tokens_param: str = "max_tokens"
+    max_tokens: int = _MAX_TOKENS
+    supports_temperature: bool = True
+    temperature: float = _TEMPERATURE
+
+    # Ölçülmüş cevap kalitesi (aşağıdaki nota bakınız).
+    answers_with_citations: bool = True
+    quality_warning: str | None = None
+
+    def payload_limits(self) -> dict[str, object]:
+        """Bu modele gönderilebilecek sıcaklık/uzunluk alanları."""
+        limits: dict[str, object] = {self.max_tokens_param: self.max_tokens}
+        if self.supports_temperature:
+            limits["temperature"] = self.temperature
+        return limits
+
+
+_CHAT_MODELS: tuple[ChatModel, ...] = (
+    ChatModel(
+        id="gpt-4.1-mini",
+        deployment="gpt-4.1-mini",
+        label="GPT-4.1 mini",
+        note="Varsayılan — kapı eşikleri bu modelle kalibre edildi",
+        context_tokens=128_000,
+    ),
+    ChatModel(
+        id="gpt-5-mini",
+        deployment="gpt-5-mini",
+        label="GPT-5 mini",
+        note="Alternatif — akıl yürüten model",
+        context_tokens=400_000,
+        max_tokens_param="max_completion_tokens",
+        max_tokens=4096,
+        supports_temperature=False,
+        answers_with_citations=False,
+        quality_warning=(
+            "Bu modelde aynı aramayı tekrarlayıp tur sınırına çarpıyor ve "
+            "cevap yazmadan bitiriyor; sorular çoğunlukla reddediliyor."
+        ),
+    ),
+    ChatModel(
+        id="Phi-4-mini-instruct",
+        deployment="Phi-4-mini-instruct",
+        label="Phi-4 mini instruct",
+        note="Bütçe — küçük model",
+        context_tokens=128_000,
+        answers_with_citations=False,
+        quality_warning=(
+            "Doğru kaynağı buluyor ama [n] atıf işaretini koymuyor; atıf kapısı cevabı reddediyor."
+        ),
+    ),
+    ChatModel(
+        id="cohere-command-a",
+        deployment="cohere-command-a",
+        label="Cohere Command A",
+        note="OpenAI dışı",
+        deployed=False,
+        unavailable_reason=_NO_QUOTA,
+    ),
+)
+
+_BY_ID = {model.id: model for model in _CHAT_MODELS}
+
+# Menü ve eski `ModelInfo` API'si yalnızca gerçekten dağıtılmış modelleri görür.
+_MODELS = tuple(
+    ModelInfo(model.id, PROVIDER, model.label, model.context_tokens)
+    for model in _CHAT_MODELS
+    if model.deployed
+)
 
 
 def list_models() -> list[ModelInfo]:
-    """Every model this deployment can use."""
+    """Bu dağıtımın gerçekten kullanabildiği modeller."""
     return list(_MODELS)
 
 
 def get_model(model_id: str) -> ModelInfo | None:
-    """Look up a model by id; None when it is not this deployment's model."""
+    """Kimliğe göre model; bu dağıtımın modeli değilse None."""
     return next((model for model in _MODELS if model.id == model_id), None)
+
+
+def available_chat_models() -> list[ChatModel]:
+    """Menünün çizdiği tüm modeller — dağıtılmamış olanlar sebebiyle birlikte."""
+    return list(_CHAT_MODELS)
+
+
+def resolve_chat_model(model_id: str | None) -> ChatModel:
+    """Seçimi kataloğa karşı çözer.
+
+    Boş seçim varsayılana düşer. Tanınmayan bir ad `KeyError` yükseltir —
+    çağıran bunu 400'e çevirir, çünkü istemciden gelen metin hiçbir koşulda
+    dağıtım adı olarak kullanılmamalıdır.
+    """
+    if not model_id:
+        return _BY_ID[DEFAULT_CHAT_MODEL]
+    if model_id not in _BY_ID:
+        raise KeyError(model_id)
+    return _BY_ID[model_id]

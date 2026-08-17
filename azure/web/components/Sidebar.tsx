@@ -6,6 +6,7 @@ import { useState } from "react";
 import { groupByDate } from "@/lib/storage";
 import { Conversation } from "@/lib/types";
 import ConversationItem from "./ConversationItem";
+import SettingsMenu from "./SettingsMenu";
 
 export default function Sidebar({
   conversations,
@@ -136,6 +137,7 @@ export default function Sidebar({
       </div>
 
       <div className="flex flex-col gap-1 border-t border-[var(--border)] p-2">
+        <SettingsMenu collapsed={collapsed} />
         <Link
           href="/analiz"
           title="Bölüm 2 analizi"

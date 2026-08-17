@@ -86,6 +86,66 @@ def test_uses_temperature_zero():
     assert fake.chat.completions.payloads[0]["temperature"] == 0.0
 
 
+# --- model seçimi (ölçülmüş parametre farkları) ------------------------------
+
+
+def test_a_selected_model_overrides_the_configured_deployment():
+    """Menüden seçilen model, yapılandırmadaki varsayılanın yerine geçer."""
+    fake = FakeClient([_delta_chunk("x"), _usage_chunk()])
+    client = AzureOpenAIClient(config=_config(), client=fake, model_id="gpt-5-mini")
+
+    client.chat([{"role": "user", "content": "s"}])
+
+    assert fake.chat.completions.payloads[0]["model"] == "gpt-5-mini"
+
+
+def test_gpt5_sends_max_completion_tokens_and_no_temperature():
+    """Canlıda ölçüldü: `max_tokens` ve `temperature=0` ikisi de HTTP 400 veriyor."""
+    fake = FakeClient([_delta_chunk("x"), _usage_chunk()])
+    client = AzureOpenAIClient(config=_config(), client=fake, model_id="gpt-5-mini")
+
+    client.chat([{"role": "user", "content": "s"}])
+
+    payload = fake.chat.completions.payloads[0]
+    assert "max_tokens" not in payload
+    assert "temperature" not in payload
+    assert payload["max_completion_tokens"] > 1024
+
+
+def test_the_default_model_keeps_its_measured_call_shape():
+    """Bölüm 1'in kalibrasyonu bu şekle bağlı; alternatifler onu değiştirmemeli."""
+    fake = FakeClient([_delta_chunk("x"), _usage_chunk()])
+    client = AzureOpenAIClient(config=_config(), client=fake, model_id="gpt-4.1-mini")
+
+    client.chat([{"role": "user", "content": "s"}])
+
+    payload = fake.chat.completions.payloads[0]
+    assert payload["temperature"] == 0.0
+    assert payload["max_tokens"] == 1024
+    assert "max_completion_tokens" not in payload
+
+
+def test_an_unknown_model_is_refused_before_any_request():
+    """Tanınmayan ad dağıtım adı olarak kullanılamaz."""
+    import pytest
+
+    fake = FakeClient([_delta_chunk("x"), _usage_chunk()])
+
+    with pytest.raises(KeyError):
+        AzureOpenAIClient(config=_config(), client=fake, model_id="../gizli")
+
+    assert fake.chat.completions.payloads == []
+
+
+def test_the_reported_model_follows_the_selection():
+    """`agent.py` metrikleri bu alandan etiketliyor."""
+    fake = FakeClient([_delta_chunk("x"), _usage_chunk()])
+
+    client = AzureOpenAIClient(config=_config(), client=fake, model_id="Phi-4-mini-instruct")
+
+    assert client.model == "Phi-4-mini-instruct"
+
+
 def test_wraps_tool_schemas_in_function_envelope():
     fake = FakeClient([_delta_chunk("x"), _usage_chunk()])
     schema = {"name": "t", "description": "d", "parameters": {"type": "object"}}

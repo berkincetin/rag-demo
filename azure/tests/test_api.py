@@ -137,10 +137,14 @@ def test_empty_question_is_rejected(client):
     assert response.status_code == 400
 
 
-def test_models_lists_only_the_azure_deployment(client):
+def test_models_lists_every_deployed_model_with_the_default_active(client):
     body = client.get("/api/models", headers=AUTH).json()
 
-    assert [m["id"] for m in body["models"]] == ["gpt-4.1-mini"]
+    assert [m["id"] for m in body["models"]] == [
+        "gpt-4.1-mini",
+        "gpt-5-mini",
+        "Phi-4-mini-instruct",
+    ]
     assert body["activeId"] == "gpt-4.1-mini"
 
 
@@ -452,3 +456,132 @@ def test_summarize_requires_the_internal_token(client):
     response = client.post("/api/summarize", json={"previousSummary": "", "messages": []})
 
     assert response.status_code == 401
+
+
+# --- model seçimi ------------------------------------------------------------
+
+
+def test_a_selected_model_is_carried_into_the_answer(client, monkeypatch):
+    """Seçim isteğe kadar taşınıyor mu — ajan hangi modelle kurulduğunu bildiriyor."""
+    from azure.rag import api
+
+    built: list[str | None] = []
+
+    def fake_build(model_id=None):
+        built.append(model_id)
+        return StubAgent()
+
+    monkeypatch.setattr(api, "_agent_for", fake_build)
+
+    client.post(
+        "/api/ask", json={"question": "yakıt limiti", "modelId": "gpt-5-mini"}, headers=AUTH
+    )
+
+    assert built == ["gpt-5-mini"]
+
+
+def test_an_unknown_model_is_rejected_with_400(client):
+    response = client.post(
+        "/api/ask",
+        json={"question": "yakıt limiti", "modelId": "../gizli-model"},
+        headers=AUTH,
+    )
+
+    assert response.status_code == 400
+
+
+def test_an_undeployed_model_is_rejected_with_400(client):
+    """Kotası olmayan model katalogda var ama seçilemez."""
+    response = client.post(
+        "/api/ask",
+        json={"question": "yakıt limiti", "modelId": "cohere-command-a"},
+        headers=AUTH,
+    )
+
+    assert response.status_code == 400
+
+
+def test_omitting_the_model_uses_the_calibrated_default(client):
+    body = client.post("/api/ask", json={"question": "yakıt limiti"}, headers=AUTH).json()
+
+    assert body["modelId"] == "gpt-4.1-mini"
+
+
+def test_the_models_endpoint_reports_why_a_model_cannot_be_used(client):
+    body = client.get("/api/models", headers=AUTH).json()
+
+    assert "unavailable" in body
+    reasons = {m["id"]: m["reason"] for m in body["unavailable"]}
+    assert "cohere-command-a" in reasons
+    assert reasons["cohere-command-a"]
+
+
+def test_streaming_also_honours_the_model_selection(client, monkeypatch):
+    from azure.rag import api
+
+    built: list[str | None] = []
+
+    def fake_build(model_id=None):
+        built.append(model_id)
+        return StubAgent()
+
+    monkeypatch.setattr(api, "_agent_for", fake_build)
+
+    with client.stream(
+        "POST",
+        "/api/ask/stream",
+        json={"question": "yakıt limiti", "modelId": "Phi-4-mini-instruct"},
+        headers=AUTH,
+    ) as response:
+        for _ in response.iter_lines():
+            pass
+
+    assert built == ["Phi-4-mini-instruct"]
+
+
+def test_agent_for_reuses_the_real_agents_wiring(monkeypatch):
+    """`_agent_for` gerçek `Agent` alanlarını kullanmalı.
+
+    Diğer testler ajanı stub'ladığı için yanlış bir öznitelik adı (`tools` vs
+    `toolbox`) fark edilmeden geçebiliyordu; bu test gerçek sınıfın alanlarına
+    bakarak onu yakalar.
+    """
+    from azure.rag import api
+    from azure.rag.agent import Agent
+
+    class _Llm:
+        model = "gpt-4.1-mini"
+
+    base = Agent.__new__(Agent)
+    base.retriever = object()
+    base.toolbox = object()
+    base.llm = _Llm()
+    base.max_tool_turns = 3
+    base.metrics = None
+
+    built = {}
+
+    def fake_agent_cls(retriever, toolbox, llm, max_tool_turns, metrics=None):
+        built.update(retriever=retriever, toolbox=toolbox, llm=llm)
+        return "yeni-ajan"
+
+    monkeypatch.setattr(api, "_AGENT", base)
+    monkeypatch.setattr("azure.rag.agent.Agent", fake_agent_cls)
+    monkeypatch.setattr(api, "AzureOpenAIClient", lambda model_id: f"llm:{model_id}")
+
+    result = api._agent_for("gpt-5-mini")
+
+    assert result == "yeni-ajan"
+    assert built["retriever"] is base.retriever
+    assert built["toolbox"] is base.toolbox
+    assert built["llm"] == "llm:gpt-5-mini"
+
+
+def test_the_models_endpoint_reports_measured_quality_warnings(client):
+    """Ölçümde atıflı cevap üretemeyen modeller menüde uyarıyla görünür."""
+    body = client.get("/api/models", headers=AUTH).json()
+
+    warnings = body["warnings"]
+    assert "gpt-5-mini" in warnings
+    assert "Phi-4-mini-instruct" in warnings
+    assert "gpt-4.1-mini" not in warnings

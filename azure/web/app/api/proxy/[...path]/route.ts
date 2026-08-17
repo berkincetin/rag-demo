@@ -18,7 +18,16 @@ export const runtime = "nodejs";
 
 // Explicit allow-list: anything not named here cannot be reached, even if the
 // backend later grows an endpoint we did not intend to expose.
-const ALLOWED = new Set(["api/ask", "api/chat/clear", "api/models", "api/metrics"]);
+const ALLOWED = new Set([
+  "api/ask",
+  "api/ask/stream",
+  "api/chat/clear",
+  "api/models",
+  "api/metrics",
+  "api/summarize",
+  "api/documents",
+  "api/documents/upload",
+]);
 
 async function forward(request: NextRequest, path: string[]) {
   const session = await verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value ?? "");
@@ -32,24 +41,47 @@ async function forward(request: NextRequest, path: string[]) {
   }
 
   const backend = process.env.BACKEND_URL ?? "";
-  const body = request.method === "GET" ? undefined : await request.text();
+  // Query strings carry conversation_id and filename for the document endpoints.
+  const query = request.nextUrl.search;
 
-  const response = await fetch(`${backend}/${target}`, {
+  const headers: Record<string, string> = {
+    "X-Internal-Token": process.env.INTERNAL_TOKEN ?? "",
+    // Server-derived: the client's value is deliberately discarded.
+    "X-Session-Id": session.sid,
+  };
+  // Forwarded verbatim rather than forced to JSON: a multipart upload carries
+  // its boundary in this header, and rewriting it makes the body unparseable.
+  const incomingType = request.headers.get("content-type");
+  if (incomingType) headers["Content-Type"] = incomingType;
+
+  const hasBody = request.method !== "GET" && request.method !== "DELETE";
+
+  const response = await fetch(`${backend}/${target}${query}`, {
     method: request.method,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Internal-Token": process.env.INTERNAL_TOKEN ?? "",
-      // Server-derived: the client's value is deliberately discarded.
-      "X-Session-Id": session.sid,
-    },
-    body,
+    headers,
+    body: hasBody ? await request.arrayBuffer() : undefined,
     cache: "no-store",
   });
+
+  const contentType = response.headers.get("Content-Type") ?? "application/json";
+
+  // SSE must reach the browser as it arrives; buffering it into a string would
+  // deliver the whole answer at once and defeat streaming entirely.
+  if (contentType.startsWith("text/event-stream")) {
+    return new NextResponse(response.body, {
+      status: response.status,
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  }
 
   const text = await response.text();
   return new NextResponse(text, {
     status: response.status,
-    headers: { "Content-Type": response.headers.get("Content-Type") ?? "application/json" },
+    headers: { "Content-Type": contentType },
   });
 }
 
@@ -60,5 +92,9 @@ export async function GET(request: NextRequest, context: Context) {
 }
 
 export async function POST(request: NextRequest, context: Context) {
+  return forward(request, (await context.params).path);
+}
+
+export async function DELETE(request: NextRequest, context: Context) {
   return forward(request, (await context.params).path);
 }

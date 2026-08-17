@@ -163,3 +163,112 @@ describe("proxy", () => {
     expect(calls).toHaveLength(0);
   });
 });
+
+describe("proxy transport", () => {
+  it("forwards a streaming response without buffering", async () => {
+    const encoder = new TextEncoder();
+    const upstream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"type":"start"}\n\n'));
+        controller.close();
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(upstream, {
+            status: 200,
+            headers: { "Content-Type": "text/event-stream" },
+          }),
+      ),
+    );
+    const { POST } = await import("../app/api/proxy/[...path]/route");
+
+    const request = await authedRequest("http://localhost:3000/api/proxy/api/ask/stream");
+    const response = await POST(request, {
+      params: Promise.resolve({ path: ["api", "ask", "stream"] }),
+    });
+
+    expect(response.headers.get("Content-Type")).toBe("text/event-stream");
+    expect(response.body).not.toBeNull();
+  });
+
+  it("allows the upload endpoint through", async () => {
+    const calls = stubFetch();
+    const { POST } = await import("../app/api/proxy/[...path]/route");
+
+    const request = await authedRequest("http://localhost:3000/api/proxy/api/documents/upload");
+    const response = await POST(request, {
+      params: Promise.resolve({ path: ["api", "documents", "upload"] }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("preserves the multipart content type so the boundary survives", async () => {
+    const calls = stubFetch();
+    const { POST } = await import("../app/api/proxy/[...path]/route");
+    const { createSessionToken, SESSION_COOKIE } = await import("../lib/auth");
+    const { NextRequest } = await import("next/server");
+
+    const boundary = "multipart/form-data; boundary=----abc123";
+    const request = new NextRequest("http://localhost:3000/api/proxy/api/documents/upload", {
+      method: "POST",
+      headers: { "Content-Type": boundary },
+      body: "irrelevant",
+    });
+    request.cookies.set(SESSION_COOKIE, await createSessionToken("demo"));
+    await POST(request, { params: Promise.resolve({ path: ["api", "documents", "upload"] }) });
+
+    expect(new Headers(calls[0].init.headers).get("Content-Type")).toBe(boundary);
+  });
+
+  it("supports DELETE and carries the query string upstream", async () => {
+    const calls = stubFetch();
+    const { DELETE } = await import("../app/api/proxy/[...path]/route");
+    const { createSessionToken, SESSION_COOKIE } = await import("../lib/auth");
+    const { NextRequest } = await import("next/server");
+
+    const request = new NextRequest(
+      "http://localhost:3000/api/proxy/api/documents?conversation_id=c1&filename=a.txt",
+      { method: "DELETE" },
+    );
+    request.cookies.set(SESSION_COOKIE, await createSessionToken("demo"));
+    const response = await DELETE(request, {
+      params: Promise.resolve({ path: ["api", "documents"] }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(calls[0].url).toContain("conversation_id=c1");
+    expect(calls[0].url).toContain("filename=a.txt");
+  });
+
+  it("still refuses an endpoint outside the allow-list", async () => {
+    const calls = stubFetch();
+    const { POST } = await import("../app/api/proxy/[...path]/route");
+
+    const request = await authedRequest("http://localhost:3000/api/proxy/api/secret");
+    const response = await POST(request, { params: Promise.resolve({ path: ["api", "secret"] }) });
+
+    expect(response.status).toBe(404);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("requires a session for DELETE too", async () => {
+    const calls = stubFetch();
+    const { DELETE } = await import("../app/api/proxy/[...path]/route");
+    const { NextRequest } = await import("next/server");
+
+    const request = new NextRequest("http://localhost:3000/api/proxy/api/documents", {
+      method: "DELETE",
+    });
+    const response = await DELETE(request, {
+      params: Promise.resolve({ path: ["api", "documents"] }),
+    });
+
+    expect(response.status).toBe(401);
+    expect(calls).toHaveLength(0);
+  });
+});

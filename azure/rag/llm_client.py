@@ -12,6 +12,7 @@ from typing import Any
 
 from azure.rag.config import AzureConfig
 from azure.rag.models import TokenUsage
+from azure.rag.request_context import emit_token
 
 # Measured in Part 1: at a higher temperature the model intermittently omits
 # the [n] citation marker and the citation gate then rejects a correct answer.
@@ -60,35 +61,69 @@ class AzureOpenAIClient:
     def chat(
         self, messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None = None
     ) -> LLMResponse:
+        """Stream the completion, returning the same shape a blocking call did.
+
+        Streaming is an observation layer, not a control-flow change: the agent
+        graph still receives one complete LLMResponse. The only difference is
+        that text deltas are published to the request's token sink on the way
+        through, which is what lets the browser render the answer as it arrives.
+        """
         payload: dict[str, Any] = {
             # On Azure this is the deployment name, not the model name.
             "model": self.config.chat_deployment,
             "messages": messages,
             "temperature": _TEMPERATURE,
             "max_tokens": _MAX_TOKENS,
+            "stream": True,
+            # Without this the streamed response carries no usage at all and
+            # every token count and cost silently becomes null.
+            "stream_options": {"include_usage": True},
         }
         if tools:
             payload["tools"] = [{"type": "function", "function": schema} for schema in tools]
 
-        completion = self._client.chat.completions.create(**payload)
-        choice = completion.choices[0].message
+        text_parts: list[str] = []
+        # Keyed by the delta's `index`, which is how the API ties the fragments
+        # of one tool call together across chunks.
+        partial_calls: dict[int, dict[str, Any]] = {}
+        usage = TokenUsage()
+
+        for chunk in self._client.chat.completions.create(**payload):
+            chunk_usage = getattr(chunk, "usage", None)
+            if chunk_usage is not None:
+                usage = TokenUsage(
+                    getattr(chunk_usage, "prompt_tokens", None),
+                    getattr(chunk_usage, "completion_tokens", None),
+                )
+            if not chunk.choices:
+                continue
+
+            delta = chunk.choices[0].delta
+            content = getattr(delta, "content", None)
+            if content:
+                text_parts.append(content)
+                emit_token(content)
+
+            for call in getattr(delta, "tool_calls", None) or []:
+                slot = partial_calls.setdefault(call.index, {"id": "", "name": "", "arguments": ""})
+                if call.id:
+                    slot["id"] = call.id
+                function = getattr(call, "function", None)
+                if function is not None:
+                    if getattr(function, "name", None):
+                        slot["name"] = function.name
+                    if getattr(function, "arguments", None):
+                        slot["arguments"] += function.arguments
+
         calls = [
             ToolCall(
-                id=call.id,
-                name=call.function.name,
-                arguments=_as_dict(call.function.arguments),
+                id=slot["id"],
+                name=slot["name"],
+                arguments=_as_dict(slot["arguments"] or "{}"),
             )
-            for call in (choice.tool_calls or [])
+            for _, slot in sorted(partial_calls.items())
         ]
-        usage = getattr(completion, "usage", None)
-        return LLMResponse(
-            text=choice.content,
-            tool_calls=calls,
-            usage=TokenUsage(
-                getattr(usage, "prompt_tokens", None),
-                getattr(usage, "completion_tokens", None),
-            ),
-        )
+        return LLMResponse(text="".join(text_parts) or None, tool_calls=calls, usage=usage)
 
 
 def _as_dict(value: Any) -> dict[str, Any]:

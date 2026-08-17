@@ -19,17 +19,21 @@ Run with:  uvicorn azure.rag.api:app --host 0.0.0.0 --port 8000
 
 import hmac
 import os
+import tempfile
 import time
 from collections import defaultdict
-from typing import Any
+from pathlib import Path
+from typing import Annotated, Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from azure.rag.build import build_agent
 from azure.rag.catalog import list_models
 from azure.rag.config import AzureConfig
+from azure.rag.embedder import AzureOpenAIEmbedder
+from azure.rag.loaders import UPLOAD_SUFFIXES
 from azure.rag.memory import ConversationMemory
 from azure.rag.metrics import MetricsStore
 from azure.rag.pricing import estimate_cost
@@ -44,6 +48,8 @@ from azure.rag.ui_state import (
     get_user_name,
     set_user_name,
 )
+from azure.rag.upload_search import UploadAwareRetriever
+from azure.rag.uploads import MAX_FILE_BYTES, UploadLimitError, UploadStore, build_uploaded_doc
 
 # docs_url/redoc_url disabled: an internal service does not need to publish an
 # interactive schema, and it is one less thing to reach if ingress is ever
@@ -52,6 +58,11 @@ app = FastAPI(title="Nobel RAG API", version="1.0", docs_url=None, redoc_url=Non
 
 _SESSIONS: dict[str, dict[str, Any]] = {}
 _AGENT: Any = None
+_EMBEDDER: Any = None
+
+# Uploaded documents live here and nowhere else: in memory, per replica, and
+# only until the TTL expires. Nothing is written to disk.
+_UPLOADS = UploadStore()
 
 # Per-session rate limit. In-memory, therefore per-replica: effective for this
 # deployment's traffic, approximate under multi-replica scale. A shared store
@@ -88,6 +99,23 @@ def _agent():
 
 def _store() -> MetricsStore:
     return MetricsStore(AzureConfig.load().storage_dir / "metrics.db")
+
+
+def _embedder():
+    """Built once; the upload path is the only caller in this process."""
+    global _EMBEDDER
+    if _EMBEDDER is None:
+        _EMBEDDER = AzureOpenAIEmbedder(AzureConfig.load())
+    return _EMBEDDER
+
+
+def _upload_key(session_id: str, conversation_id: str) -> str:
+    """Namespaced so one session can never read another's uploads."""
+    return f"{session_id}:{conversation_id}"
+
+
+def _document_list(docs) -> list[dict[str, Any]]:
+    return [{"filename": doc.filename, "chunkCount": len(doc.chunks)} for doc in docs]
 
 
 def _check_rate_limit(session_id: str) -> None:
@@ -128,6 +156,7 @@ def ask(body: AskRequest, x_session_id: str | None = Header(default=None)):
 class StreamAskRequest(BaseModel):
     question: str
     userName: str | None = None
+    conversationId: str | None = None
     # Client-owned conversation state: the browser holds N conversations per
     # session, so the server cannot key memory by session alone.
     summary: str | None = None
@@ -154,6 +183,32 @@ def _memory_from_client(
     return memory
 
 
+def _answer_for(session_id, conversation_id, question, memory, session):
+    """Answer, widening retrieval to this conversation's uploads when it has any.
+
+    The graph itself is untouched: only the retriever it is built around
+    changes. Recompiling the state machine is cheap — the loaded index and the
+    LLM client are shared, not rebuilt.
+    """
+    agent = _agent()
+    key = _upload_key(session_id, conversation_id or "default")
+    if not _UPLOADS.get(key):
+        return agent.answer(question, memory=memory, user_name=get_user_name(session))
+
+    from azure.rag.agent import Agent
+    from azure.rag.tools import ToolBox
+
+    wrapped = UploadAwareRetriever(agent.retriever, key, _UPLOADS)
+    scoped = Agent(
+        wrapped,
+        ToolBox(wrapped),
+        agent.llm,
+        agent.max_tool_turns,
+        metrics=agent.metrics,
+    )
+    return scoped.answer(question, memory=memory, user_name=get_user_name(session))
+
+
 @app.post("/api/ask/stream", dependencies=[Depends(require_internal_token)])
 def ask_stream(body: StreamAskRequest, x_session_id: str | None = Header(default=None)):
     """Answer as a stream of SSE events.
@@ -174,7 +229,7 @@ def ask_stream(body: StreamAskRequest, x_session_id: str | None = Header(default
     model_id = list_models()[0].id
 
     def run(_emit):
-        answer = _agent().answer(question, memory=memory, user_name=get_user_name(session))
+        answer = _answer_for(session_id, body.conversationId, question, memory, session)
         return {"text": answer.text, "citations": list(answer.citations), "answer": answer}
 
     def on_meta(result):
@@ -203,6 +258,88 @@ def ask_stream(body: StreamAskRequest, x_session_id: str | None = Header(default
 def clear(x_session_id: str | None = Header(default=None)):
     clear_chat(_session(x_session_id))
     return {"ok": True}
+
+
+# --- uploaded documents ------------------------------------------------------
+
+
+@app.post("/api/documents/upload", dependencies=[Depends(require_internal_token)])
+async def upload_document(
+    # Annotated form rather than `= File(...)`: a call in an argument default
+    # trips ruff's B008.
+    file: Annotated[UploadFile, File()],
+    conversation_id: Annotated[str, Form()],
+    x_session_id: str | None = Header(default=None),
+):
+    """Parse and embed one file, keeping only its chunks in memory.
+
+    The bytes exist on disk for exactly as long as the parser needs a path, and
+    are removed before this returns.
+    """
+    session_id = x_session_id or "default"
+    _check_rate_limit(session_id)
+
+    filename = file.filename or ""
+    suffix = Path(filename).suffix.lower()
+    if suffix not in UPLOAD_SUFFIXES:
+        raise HTTPException(
+            status_code=400,
+            detail="Yalnızca .pdf, .docx, .xlsx ve .txt dosyaları yüklenebilir.",
+        )
+
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="Dosya boş.")
+    if len(contents) > MAX_FILE_BYTES:
+        raise HTTPException(status_code=413, detail="Dosya 10 MB sınırını aşıyor.")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as handle:
+        handle.write(contents)
+        temp_path = Path(handle.name)
+    try:
+        doc = build_uploaded_doc(temp_path, _embedder())
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    finally:
+        os.remove(temp_path)
+
+    # The temp file's generated name must not leak into citations.
+    doc.filename = filename
+    key = _upload_key(session_id, conversation_id)
+    try:
+        _UPLOADS.add(key, doc)
+    except UploadLimitError as error:
+        raise HTTPException(status_code=413, detail=str(error)) from error
+
+    return {
+        "filename": filename,
+        "chunkCount": len(doc.chunks),
+        "documents": _document_list(_UPLOADS.get(key)),
+    }
+
+
+@app.get("/api/documents", dependencies=[Depends(require_internal_token)])
+def list_uploaded(conversation_id: str, x_session_id: str | None = Header(default=None)):
+    key = _upload_key(x_session_id or "default", conversation_id)
+    return {"documents": _document_list(_UPLOADS.get(key))}
+
+
+@app.delete("/api/documents", dependencies=[Depends(require_internal_token)])
+def delete_uploaded(
+    conversation_id: str,
+    filename: str | None = None,
+    x_session_id: str | None = Header(default=None),
+):
+    """Drop one document, or the whole conversation when no filename is given.
+
+    The second form is what the front-end calls when a conversation is deleted:
+    its uploads must not outlive it, TTL or no TTL.
+    """
+    key = _upload_key(x_session_id or "default", conversation_id)
+    if filename is None:
+        _UPLOADS.clear(key)
+        return {"documents": []}
+    return {"documents": _document_list(_UPLOADS.remove(key, filename))}
 
 
 @app.get("/api/models", dependencies=[Depends(require_internal_token)])

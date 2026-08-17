@@ -254,3 +254,165 @@ def test_ask_stream_rebuilds_memory_from_client_history(client):
     # Only completed pairs become turns; the dangling question is not a turn.
     assert len(memory) == 1
     assert memory.last_turn().question == "İzin nasıl alınır?"
+
+
+# --- uploads -----------------------------------------------------------------
+
+
+class _FakeEmbedder:
+    """Deterministic stand-in: no network, no Azure credentials in tests."""
+
+    def encode(self, texts):
+        return [[1.0, 0.0, 0.0] for _ in texts]
+
+
+@pytest.fixture
+def upload_client(client, monkeypatch):
+    from azure.rag import api
+
+    api._UPLOADS.clear("s1:c1")
+    monkeypatch.setattr(api, "_EMBEDDER", _FakeEmbedder())
+    return client
+
+
+def _upload(
+    client, name=b"notlar.txt", content=b"Yillik izin 14 gundur.", conversation="c1", session="s1"
+):
+    return client.post(
+        "/api/documents/upload",
+        files={"file": (name.decode() if isinstance(name, bytes) else name, content, "text/plain")},
+        data={"conversation_id": conversation},
+        headers={"X-Internal-Token": "secret-token", "X-Session-Id": session},
+    )
+
+
+def test_upload_accepts_a_text_file_and_lists_it(upload_client):
+    response = _upload(upload_client)
+
+    assert response.status_code == 200
+    assert response.json()["filename"] == "notlar.txt"
+    assert response.json()["chunkCount"] >= 1
+
+    listed = upload_client.get("/api/documents?conversation_id=c1", headers=AUTH)
+    assert [d["filename"] for d in listed.json()["documents"]] == ["notlar.txt"]
+
+
+def test_upload_rejects_an_unsupported_type(upload_client):
+    response = upload_client.post(
+        "/api/documents/upload",
+        files={"file": ("virus.exe", b"\x00", "application/octet-stream")},
+        data={"conversation_id": "c1"},
+        headers=AUTH,
+    )
+
+    assert response.status_code == 400
+
+
+def test_upload_rejects_an_empty_file(upload_client):
+    response = _upload(upload_client, name="bos.txt", content=b"")
+
+    assert response.status_code == 400
+
+
+def test_upload_rejects_a_file_over_the_size_limit(upload_client):
+    from azure.rag.uploads import MAX_FILE_BYTES
+
+    response = _upload(upload_client, name="buyuk.txt", content=b"x" * (MAX_FILE_BYTES + 1))
+
+    assert response.status_code == 413
+
+
+def test_documents_are_scoped_to_the_session(upload_client):
+    _upload(upload_client, name="gizli.txt", content=b"gizli metin", session="sA")
+
+    other = upload_client.get(
+        "/api/documents?conversation_id=c1",
+        headers={"X-Internal-Token": "secret-token", "X-Session-Id": "sB"},
+    )
+
+    assert other.json()["documents"] == []
+
+
+def test_delete_removes_the_named_document(upload_client):
+    _upload(upload_client, name="a.txt", conversation="c9")
+
+    response = upload_client.request(
+        "DELETE", "/api/documents?conversation_id=c9&filename=a.txt", headers=AUTH
+    )
+
+    assert response.json()["documents"] == []
+
+
+def test_delete_without_a_filename_clears_the_whole_conversation(upload_client):
+    """What the front-end calls when a conversation is deleted."""
+    _upload(upload_client, name="a.txt", conversation="c7")
+    _upload(upload_client, name="b.txt", conversation="c7")
+
+    response = upload_client.request("DELETE", "/api/documents?conversation_id=c7", headers=AUTH)
+
+    assert response.json()["documents"] == []
+    listed = upload_client.get("/api/documents?conversation_id=c7", headers=AUTH)
+    assert listed.json()["documents"] == []
+
+
+def test_documents_endpoint_requires_the_internal_token(client):
+    assert client.get("/api/documents?conversation_id=c1").status_code == 401
+
+
+def test_upload_endpoint_requires_the_internal_token(client):
+    response = client.post(
+        "/api/documents/upload",
+        files={"file": ("a.txt", b"x", "text/plain")},
+        data={"conversation_id": "c1"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_streaming_widens_retrieval_when_the_conversation_has_uploads(upload_client, monkeypatch):
+    """The agent must be rebuilt around an upload-aware retriever, not the bare one."""
+    from azure.rag import api
+
+    seen = {}
+
+    class _RecordingAgent(StubAgent):
+        retriever = type(
+            "R", (), {"index": None, "embedder": None, "min_cosine": 0.25, "min_bm25": 4.22}
+        )()
+        llm = object()
+        max_tool_turns = 3
+        metrics = None
+
+    recording = _RecordingAgent()
+    monkeypatch.setattr(api, "_AGENT", recording)
+
+    def _fake_agent_class(retriever, toolbox, llm, max_tool_turns, metrics=None):
+        seen["retriever"] = retriever
+        return recording
+
+    monkeypatch.setattr("azure.rag.agent.Agent", _fake_agent_class)
+    _upload(upload_client, name="a.txt", conversation="cX")
+
+    upload_client.post(
+        "/api/ask/stream",
+        json={"question": "soru", "conversationId": "cX"},
+        headers=AUTH,
+    )
+
+    assert isinstance(seen.get("retriever"), api.UploadAwareRetriever)
+
+
+def test_streaming_uses_the_bare_agent_without_uploads(upload_client, monkeypatch):
+    called = {"wrapped": False}
+    monkeypatch.setattr(
+        "azure.rag.agent.Agent",
+        lambda *a, **k: called.__setitem__("wrapped", True),
+    )
+
+    upload_client.post(
+        "/api/ask/stream",
+        json={"question": "soru", "conversationId": "bos-sohbet"},
+        headers=AUTH,
+    )
+
+    assert called["wrapped"] is False

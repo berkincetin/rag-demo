@@ -708,29 +708,6 @@ rag-demo/
 └── docker-compose.yml       altı servis
 ```
 
----
-
-## Teslim notu
-
-`data/` klasörü ve `AI Engineer/` `.gitignore` içindedir (kaynak belgeler repoya
-işlenmez), ama **teslim ZIP'inde ikisi de vardır** — aksi halde `ingest.py`
-çalıştırılamaz ve Bölüm 2 notebook'u açılamaz.
-
-ZIP'te `web/node_modules` **yoktur** (yüzlerce MB, platforma özgü ikililer içerir).
-Next.js arayüzü ilk çalıştırmada bağımlılıkları kendisi kurar: `scripts/run_web.py`
-`node_modules` yoksa `npm install` çağırır. Docker yolunda buna hiç gerek yoktur.
-`web/package-lock.json` pakette olduğu için kurulum yeniden üretilebilir.
-
-Paketi yeniden üretmek için:
-
-```bash
-python scripts/package.py     # → rag-demo.zip
-```
-
-⚠️ **`git archive` kullanmayın.** Önceki paketin bayatlamasının sebebi buydu: `web/`,
-`gradio_app.py` ve `api.py` hâlâ untracked olduğu için sessizce dışarıda kalıyorlardı;
-`data/` ve `AI Engineer/` ise bilerek gitignore'da ama teslimde bulunmak zorunda.
-`scripts/package.py` çalışma ağacından açık bir dışlama listesiyle paketler.
 
 Paketi doğrulamanın tek geçerli yolu **açıp içinden test çalıştırmaktır** — dosya listesine
 bakmak korpusun kullanılabilir olduğunu kanıtlamaz:

@@ -592,6 +592,18 @@ onun ürettiği görseller. Mevcut kodlara dokunulmadı.
 | **Model seçimi indeksi yeniden yüklemiyor** | `_agent_for` yalnızca LLM istemcisini değiştiriyor; retriever, indeks ve araç kutusu modelden bağımsız. Aksi hâlde her istek 276 parçayı diskten yeniden okurdu |
 | **İstek gövdesi tek yerden kuruluyor** | `buildAskBody` model alanını ekliyor. Çağıran taraf `readStoredModel()` çağırıp alanı elle koysaydı, ikinci bir çağrı yeri eklendiğinde sessizce unutulur ve o yol hep varsayılan modelle çalışırdı |
 
+### Model kalite kusurunun kök nedeni ve çözümü (2026-08-18)
+
+| Konu | Öğrenilen |
+|---|---|
+| 🚨 **İki ayrı görünen kusur, tek kök neden** | Aşama 3'te `gpt-5-mini` "aramayı tekrarlıyor", `Phi-4-mini` ise "[n] koymuyor" diye raporlanmıştı. Sondalayınca ikisinin de aynı sebepten olduğu çıktı: **araç şeması önlerindeyken metin üretmiyorlar.** Phi araç sonucundan sonra `text=None, tool_calls=[]` (tamamen boş) döndürüyor — 3/3 tekrarlandı; araç şeması çekilince aynı bağlamla normal cevap yazıyor, yine 3/3. gpt-5-mini aynı durumda boş dönmek yerine aramayı tekrarlıyor. Farklı yüzeyler, aynı hastalık |
+| **Grafikteki boşluk: bütçe bitince cevap istenmiyordu** | `after_tools` bütçe dolunca doğrudan `citation_check`'e gidiyordu; orada `final_text` boş olduğu için `repair` dalı da (metin varlığı şartı, satır 211) devreye giremiyor ve altı aramalık doğru bağlam kullanılmadan `no_info` dönüyordu. Yani kusur modelde değil, **grafikte** — hiçbir yol "artık ara, cevap yaz" demiyordu |
+| **Çözüm: `final_answer` düğümü** | Araç şeması geri çekilip (`llm.chat(messages)` — `tools` yok) aynı bağlamla bir tur daha isteniyor. Prompt değişmedi, bağlam değişmedi, yalnızca araçlar çekildi. İki giriş noktası var: bütçe dolunca (`after_tools`) ve araç sonrası boş tur gelince (`after_llm`). İkincisi olmasa Phi bütçeye hiç varmadığı için kurtulmazdı |
+| **Sonsuz döngü koruması şart** | `after_llm` boş metni görünce `final_answer`'a yönlendiriyor; o düğüm de boş dönerse aynı koşul yine sağlanır ve grafik sonsuza dek döner. `answered_toolless` bayrağı bu yolu tek seferlik yapıyor — bayrak testi (`_AlwaysSearches(final_answer=None)`) bunu sabitliyor |
+| **Ölçüm: kusur giderildi** | Aynı soru, gerçek korpus: gpt-5-mini **0→3 atıf** (~18 sn, 3 tur), Phi-4-mini **0→1 atıf**, gpt-4.1-mini **2 atıf, değişmedi** — `toolless=False` olduğu için yeni yola hiç uğramıyor. Katalogdaki `quality_warning` alanları temizlendi ama alan korundu: ileride eklenecek bir modelin ölçümü yine kötü çıkabilir. Uyarı yolunun ölü kod olmadığı ayrı bir testle sabitlendi |
+| 🚨 **Model kendi transkriptini taklit ediyor** | `run_tools` her çağrıyı `{"role":"assistant","content":"[tool: search_documents]"}` olarak transkripte yazıyor. Araçsız turda bu transkript modelin bağlamı olduğu için gpt-5-mini biçimi taklit etti ve `[tool: search_documents]` satırı **kullanıcıya gösterilen cevaba sızdı**. Yalnızca canlı testte görüldü; birim testleri sahte istemci kullandığı için yakalayamazdı. Satır bazlı temizlik eklendi — tüm satır eşleşmesi aranıyor, böylece köşeli parantez içeren normal bir cümle ya da atıf zarar görmüyor |
+| **Yavaşlık kusur değil, maliyet** | gpt-5-mini 3 tur arama yapıp ~18 saniyede cevaplıyor (gpt-4.1-mini ~5 sn). Bu bir hata değil, akıl yürüten modelin doğası; menüde uyarı yerine nötr not olarak yazıldı |
+
 ## 5. Açık Sorular / Bekleyen Kararlar
 
 - **`gemini-3.5-flash` model ID'si doğrulanmadı.** Kullanıcı verdi, katalogda öyle yazıldı;

@@ -10,11 +10,21 @@ each is now its own node, so the flow can be inspected and every step measured:
         │ ▲                             │
         │ └─────────────────────────────┘  (bounded by max_tool_turns)
         │ (answered without consulting anything) ─► inject_context ─┘
-        ▼
-    citation_check ─(no citation)─► repair ─► citation_check ─► no_info
+        │                                   (budget spent) ─► final_answer ─┐
+        ▼                                                                   │
+    citation_check ◄────────────────────────────────────────────────────────┘
+        │ (no citation)─► repair ─► citation_check ─► no_info
         │ (cited)
         ▼
       finish
+
+`final_answer` re-asks the model with the tools withheld. Two measured failures
+land there, both of which used to throw away a correct context:
+
+  gpt-5-mini          repeats the same search every turn and never writes text,
+                      spending the whole budget
+  Phi-4-mini-instruct returns an empty message while the tool schema is in
+                      front of it, and answers normally once it is withheld
 
 See docs/02-karar-kaydi.md ADR-011 for why this replaced the raw loop.
 """
@@ -43,6 +53,8 @@ class AgentState(TypedDict, total=False):
     final_text: str
     citations: list[str]
     repaired: bool
+    # True once the toolless answer turn has run, so it cannot run twice.
+    answered_toolless: bool
     gate_passed: bool
     turns: int
     usage: TokenUsage
@@ -79,6 +91,7 @@ def initial_state(question: str, memory=None, user_name: str | None = None) -> A
         final_text="",
         citations=[],
         repaired=False,
+        answered_toolless=False,
         gate_passed=False,
         turns=0,
         usage=TokenUsage(),
@@ -168,6 +181,29 @@ def build_graph(retriever, toolbox, llm, max_tool_turns: int = 3):
         query = retrieval_query(state["question"], state.get("memory"))
         return _add_tool_result(state, "search_documents", {"query": query}, injected=True)
 
+    def final_answer(state: AgentState) -> AgentState:
+        """Bütçe bitti: araçsız bir tur isteyerek toplanan bağlamı cevaba çevir.
+
+        Ölçüldü (canlı `gpt-5-mini`): akıl yürüten model sistem promptundaki
+        "cevap vermeden önce HER ZAMAN ara" talimatını her turda yeniden
+        değerlendirip aynı aramayı tekrarlıyor ve hiç metin yazmıyor. Araç
+        şeması gönderilmediğinde arama seçeneği ortadan kalkar ve model
+        önündeki kaynaklardan cevabı yazar.
+
+        `tools=None` bu düğümün tamamı: prompt değişmiyor, bağlam değişmiyor,
+        yalnızca araçlar geri çekiliyor. Normal yolu izleyen modeller buraya
+        hiç uğramaz — `after_tools` yalnızca bütçe dolduğunda yönlendirir.
+        """
+        response = llm.chat(state["messages"])
+        return {
+            "final_text": response.text or "",
+            "usage": state["usage"] + response.usage,
+            # Marks this path as spent. Without it a model that returns nothing
+            # even with the tools withheld would be routed straight back here by
+            # `after_llm` and loop forever.
+            "answered_toolless": True,
+        }
+
     def citation_check(state: AgentState) -> AgentState:
         return {"citations": extract_citations(state["final_text"], state["tool_outputs"])}
 
@@ -197,11 +233,22 @@ def build_graph(retriever, toolbox, llm, max_tool_turns: int = 3):
             return "run_tools"
         if not state["tool_outputs"]:
             return "inject_context"
+        # Tools ran but the model returned neither a call nor any text. Measured
+        # on Phi-4-mini-instruct: with the tool schema in front of it the model
+        # answers with an empty message every time (3/3), and writes a normal
+        # answer the moment the schema is withheld. Retry once without tools
+        # rather than discarding the context — `final_answer` guards itself
+        # against a second pass, so a model that stays silent still reaches
+        # no_info instead of looping.
+        if not state["final_text"] and not state.get("answered_toolless"):
+            return "final_answer"
         return "citation_check"
 
     def after_tools(state: AgentState) -> str:
-        # The tool budget bounds the llm_turn <-> run_tools loop only.
-        return "llm_turn" if state["turns"] < max_tool_turns else "citation_check"
+        # The tool budget bounds the llm_turn <-> run_tools loop only. When it
+        # runs out the model has never written an answer, so go and ask for one
+        # with the tools withheld rather than discarding the gathered context.
+        return "llm_turn" if state["turns"] < max_tool_turns else "final_answer"
 
     def after_citation_check(state: AgentState) -> str:
         if state["citations"]:
@@ -218,6 +265,7 @@ def build_graph(retriever, toolbox, llm, max_tool_turns: int = 3):
     graph.add_node("llm_turn", llm_turn)
     graph.add_node("run_tools", run_tools)
     graph.add_node("inject_context", inject_context)
+    graph.add_node("final_answer", final_answer)
     graph.add_node("citation_check", citation_check)
     graph.add_node("repair", repair)
     graph.add_node("no_info", no_info)
@@ -226,9 +274,10 @@ def build_graph(retriever, toolbox, llm, max_tool_turns: int = 3):
     graph.add_conditional_edges("score_gate", after_gate, ["llm_turn", "refuse"])
     graph.add_edge("refuse", END)
     graph.add_conditional_edges(
-        "llm_turn", after_llm, ["run_tools", "inject_context", "citation_check"]
+        "llm_turn", after_llm, ["run_tools", "inject_context", "final_answer", "citation_check"]
     )
-    graph.add_conditional_edges("run_tools", after_tools, ["llm_turn", "citation_check"])
+    graph.add_conditional_edges("run_tools", after_tools, ["llm_turn", "final_answer"])
+    graph.add_edge("final_answer", "citation_check")
     graph.add_edge("inject_context", "llm_turn")
     graph.add_conditional_edges("citation_check", after_citation_check, ["repair", "no_info", END])
     graph.add_edge("repair", "citation_check")

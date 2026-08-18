@@ -577,11 +577,26 @@ def test_agent_for_reuses_the_real_agents_wiring(monkeypatch):
     assert built["llm"] == "llm:gpt-5-mini"
 
 
-def test_the_models_endpoint_reports_measured_quality_warnings(client):
-    """Ölçümde atıflı cevap üretemeyen modeller menüde uyarıyla görünür."""
+def test_no_deployed_model_currently_carries_a_warning(client):
+    """`final_answer` düğümünden sonra üçü de atıflı cevap veriyor."""
     body = client.get("/api/models", headers=AUTH).json()
 
-    warnings = body["warnings"]
-    assert "gpt-5-mini" in warnings
-    assert "Phi-4-mini-instruct" in warnings
-    assert "gpt-4.1-mini" not in warnings
+    assert body["warnings"] == {}
+
+
+def test_a_model_with_a_measured_defect_would_surface_in_the_menu(client, monkeypatch):
+    """Uyarı yolu ölü kod değil: kalitesi kötü ölçülen model menüye taşınır."""
+    from azure.rag import api, catalog
+
+    flawed = catalog.ChatModel(
+        id="kotu-model",
+        deployment="kotu-model",
+        label="Kötü Model",
+        answers_with_citations=False,
+        quality_warning="Ölçümde atıf üretmedi.",
+    )
+    monkeypatch.setattr(api, "available_chat_models", lambda: [flawed])
+
+    body = client.get("/api/models", headers=AUTH).json()
+
+    assert body["warnings"] == {"kotu-model": "Ölçümde atıf üretmedi."}

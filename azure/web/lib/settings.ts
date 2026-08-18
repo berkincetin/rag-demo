@@ -30,12 +30,12 @@ export const MODEL_OPTIONS: ModelOption[] = [
   {
     id: "gpt-5-mini",
     label: "GPT-5 mini",
-    note: "Alternatif — akıl yürütme adımı için geniş token bütçesi",
+    note: "Alternatif — akıl yürüten model, daha yavaş (~18 sn)",
   },
   {
     id: "Phi-4-mini-instruct",
     label: "Phi-4 mini instruct",
-    note: "Bütçe — küçük model, araç çağırdığı ölçüldü",
+    note: "Bütçe — küçük ve hızlı model, cevapları daha kısa",
   },
 ];
 

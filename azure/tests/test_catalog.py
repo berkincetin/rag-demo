@@ -106,20 +106,27 @@ def test_deployed_models_carry_no_unavailable_reason():
 # --- ölçülmüş cevap kalitesi -------------------------------------------------
 
 
-def test_the_default_model_is_the_only_one_measured_to_answer_with_citations():
-    """2026-08-17'de gerçek korpusta ölçüldü, tahmin değil.
+def test_every_deployed_model_answers_with_citations():
+    """2026-08-18'de gerçek korpusta yeniden ölçüldü, tahmin değil.
 
-    Aynı soru ("Yıllık izin talebimi nasıl yaparım?") üç modele soruldu:
-      gpt-4.1-mini        2 tur, 1 arama, 2 atıf  -> doğru cevap
-      gpt-5-mini          6 turda bile aynı aramayı tekrarladı, hiç cevap yazmadı
-      Phi-4-mini-instruct doğru bağlamı aldı ama [n] işareti koymadı
+    `final_answer` düğümü eklendikten sonra ("Yıllık izin talebimi nasıl
+    yaparım?", araçsız cevap turu):
+      gpt-4.1-mini        2 tur, 1 arama, 2 atıf  (yol değişmedi)
+      gpt-5-mini          3 tur, 3 arama, 3 atıf  (önce 0 idi)
+      Phi-4-mini-instruct 2 tur, 1 arama, 1 atıf  (önce 0 idi)
     """
-    assert resolve_chat_model("gpt-4.1-mini").answers_with_citations is True
+    for model in available_chat_models():
+        if model.deployed:
+            assert model.answers_with_citations is True, model.id
 
 
-def test_models_that_failed_the_citation_gate_are_flagged_with_a_warning():
-    """Kalitesi ölçülüp yetersiz bulunan seçenek sessiz bırakılmaz."""
-    for model_id in ("gpt-5-mini", "Phi-4-mini-instruct"):
-        model = resolve_chat_model(model_id)
-        assert model.answers_with_citations is False
-        assert model.quality_warning, f"{model_id} için uyarı metni yok"
+def test_no_deployed_model_carries_a_quality_warning():
+    """Ölçülen kusurlar giderildi; eskimiş uyarı bırakılmaz."""
+    for model in available_chat_models():
+        if model.deployed:
+            assert model.quality_warning is None, model.id
+
+
+def test_slower_models_still_declare_their_cost():
+    """Uyarı yerine nötr bir not: seçenek çalışıyor ama bedava değil."""
+    assert "tur" in resolve_chat_model("gpt-5-mini").note.lower()

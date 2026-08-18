@@ -19,25 +19,37 @@ Kotası olmayan modeller listede kalır ama `deployed=False` ve sebebiyle
 işaretlenir — menüde devre dışı görünür, sessizce başarısız olan bir seçenek
 bırakılmaz.
 
-## Ölçülmüş cevap kalitesi (2026-08-17, gerçek korpus, aynı soru)
+## Ölçülmüş cevap kalitesi (gerçek korpus, aynı soru)
 
 "Yıllık izin talebimi nasıl yaparım?" üç modele soruldu. Doğru cevap
-`calisan_sss_rehberi.xlsx` satır 4'te ve üçü de o parçayı aldı:
+`calisan_sss_rehberi.xlsx` satır 4'te ve üçü de o parçayı aldı.
+
+İlk ölçümde (2026-08-17) yalnızca varsayılan model atıflı cevap verebiliyordu:
 
 | Model | Tur | Arama | Atıf | Sonuç |
 |---|---|---|---|---|
 | gpt-4.1-mini | 2 | 1 | 2 | doğru cevap |
 | gpt-5-mini | 6* | 6 | 0 | hiç cevap yazmadı |
-| Phi-4-mini-instruct | 2 | 1 | 0 | [n] işareti koymadı |
+| Phi-4-mini-instruct | 2 | 1 | 0 | boş yanıt döndü |
 
 *Tur sınırı 3'ten 6'ya çıkarıldığında da değişmedi.
 
-`gpt-5-mini`'nin sebebi sistem promptu: "Cevap vermeden önce HER ZAMAN
-search_documents çağırmalısın" talimatını akıl yürütme adımında her turda
-yeniden değerlendirip aramayı tekrarlıyor. `gpt-4.1-mini` aynı talimatı
-"bir kez ara, sonra cevapla" diye okuyor. Promptu bu model için yeniden
-yazmak Aşama 3'ün kapsamı dışında; bulgu gizlenmek yerine `quality_warning`
-ile menüde gösteriliyor.
+İkisi de aynı kök nedenin iki yüzüydü: **araç şeması önlerindeyken metin
+üretmiyorlar.** `gpt-5-mini` bunun yerine aramayı tekrarlıyor, `Phi-4-mini`
+tamamen boş dönüyor (3/3). Toplanan bağlam doğruydu; sorun modelden hiç
+cevap istenmemesiydi.
+
+`graph.py`'ye `final_answer` düğümü eklendi: araç şeması geri çekilip aynı
+bağlamla bir tur daha isteniyor. Yeniden ölçüm (2026-08-18):
+
+| Model | Tur | Arama | Atıf | Sonuç |
+|---|---|---|---|---|
+| gpt-4.1-mini | 2 | 1 | 2 | değişmedi — bu yola hiç uğramıyor |
+| gpt-5-mini | 3 | 3 | 3 | doğru cevap (~18 sn) |
+| Phi-4-mini-instruct | 2 | 1 | 1 | doğru cevap |
+
+Üçü de atıflı cevap verdiği için `quality_warning` alanı artık boş; alan
+korunuyor çünkü ileride eklenecek bir modelin ölçümü yine kötü çıkabilir.
 """
 
 from dataclasses import dataclass
@@ -111,27 +123,18 @@ _CHAT_MODELS: tuple[ChatModel, ...] = (
         id="gpt-5-mini",
         deployment="gpt-5-mini",
         label="GPT-5 mini",
-        note="Alternatif — akıl yürüten model",
+        note="Alternatif — akıl yürüten model, 3 tur arama yapıyor (~18 sn)",
         context_tokens=400_000,
         max_tokens_param="max_completion_tokens",
         max_tokens=4096,
         supports_temperature=False,
-        answers_with_citations=False,
-        quality_warning=(
-            "Bu modelde aynı aramayı tekrarlayıp tur sınırına çarpıyor ve "
-            "cevap yazmadan bitiriyor; sorular çoğunlukla reddediliyor."
-        ),
     ),
     ChatModel(
         id="Phi-4-mini-instruct",
         deployment="Phi-4-mini-instruct",
         label="Phi-4 mini instruct",
-        note="Bütçe — küçük model",
+        note="Bütçe — küçük ve hızlı model, cevapları daha kısa",
         context_tokens=128_000,
-        answers_with_citations=False,
-        quality_warning=(
-            "Doğru kaynağı buluyor ama [n] atıf işaretini koymuyor; atıf kapısı cevabı reddediyor."
-        ),
     ),
     ChatModel(
         id="cohere-command-a",

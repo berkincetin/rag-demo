@@ -185,3 +185,42 @@ def test_the_retry_happens_before_the_budget_is_spent():
     # 1) araç çağrısı, 2) araç sonrası boş tur, 3) araçsız cevap turu
     assert len(llm.calls) == 3
     assert llm.calls[-1]["tools"] is None
+
+
+# --- transkript artefaktı ----------------------------------------------------
+
+
+class _EchoesToolMarker:
+    """Araçsız turda cevabına `[tool: ...]` yer tutucusuyla başlayan model.
+
+    Canlı `gpt-5-mini` bunu yaptı: `final_answer` turunda önündeki transkriptte
+    `{"role": "assistant", "content": "[tool: search_documents]"}` satırlarını
+    görüp biçimi taklit etti ve işaretçi kullanıcıya gösterilen metne sızdı.
+    """
+
+    def __init__(self):
+        self.calls = 0
+
+    def chat(self, messages, tools=None):
+        self.calls += 1
+        usage = SimpleNamespace(input_tokens=10, output_tokens=5)
+        if tools is not None:
+            return SimpleNamespace(text=None, tool_calls=[_tool_call()], usage=usage)
+        return SimpleNamespace(
+            text="[tool: search_documents]\n\nYıllık izin HRPortal'dan alınır [1].",
+            tool_calls=[],
+            usage=usage,
+        )
+
+
+def test_a_leaked_tool_marker_is_stripped_from_the_answer():
+    state = _run(_EchoesToolMarker())
+
+    assert not state["final_text"].startswith("[tool:")
+    assert state["final_text"] == "Yıllık izin HRPortal'dan alınır [1]."
+
+
+def test_stripping_the_marker_keeps_the_citations():
+    state = _run(_EchoesToolMarker())
+
+    assert state["citations"] == ["calisan_sss_rehberi.xlsx — Genel SSS, satır 4"]

@@ -29,6 +29,7 @@ land there, both of which used to throw away a correct context:
 See docs/02-karar-kaydi.md ADR-011 for why this replaced the raw loop.
 """
 
+import re
 from typing import Any, TypedDict
 
 from langgraph.graph import END, StateGraph
@@ -43,6 +44,10 @@ from azure.rag.prompts import (
     USER_NAME_LINE,
 )
 from azure.rag.tools import TOOL_SCHEMAS
+
+# `[tool: search_documents]` — the placeholder run_tools writes into the
+# transcript. Matched only as a whole line; see `_strip_tool_markers`.
+_TOOL_MARKER = re.compile(r"^\s*\[tool:[^\]]*\]\s*$")
 
 
 class AgentState(TypedDict, total=False):
@@ -64,6 +69,19 @@ class AgentState(TypedDict, total=False):
     # Session conversation history, or None for a stateless single question.
     memory: Any
     user_name: str | None
+
+
+def _strip_tool_markers(text: str) -> str:
+    """Drop `[tool: name]` placeholder lines the model copied from the transcript.
+
+    `run_tools` records each call as an assistant message reading
+    `[tool: search_documents]`. In the toolless answer turn that transcript is
+    the model's context, and gpt-5-mini was measured imitating the format —
+    the marker then reached the user. Only whole lines are removed, so a
+    citation or a sentence that merely contains brackets survives.
+    """
+    kept = [line for line in text.splitlines() if not _TOOL_MARKER.match(line)]
+    return "\n".join(kept).strip()
 
 
 def _system_prompt(state: "AgentState") -> str:
@@ -196,7 +214,7 @@ def build_graph(retriever, toolbox, llm, max_tool_turns: int = 3):
         """
         response = llm.chat(state["messages"])
         return {
-            "final_text": response.text or "",
+            "final_text": _strip_tool_markers(response.text or ""),
             "usage": state["usage"] + response.usage,
             # Marks this path as spent. Without it a model that returns nothing
             # even with the tools withheld would be routed straight back here by

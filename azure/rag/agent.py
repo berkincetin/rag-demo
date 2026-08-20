@@ -2,7 +2,7 @@
 
 Layer 1 refuses off-topic questions on retrieval score alone, before any LLM
 call. Layer 2 is the grounded system prompt. Layer 3 rejects any answer that
-cites nothing. See docs/02-karar-kaydi.md ADR-008.
+cites nothing. See docs/planlama/02-karar-kaydi.md ADR-008.
 
 Differs from src/rag/agent.py in one way: no resource monitor. That module
 samples CPU/RAM/GPU to make a local-vs-cloud cost comparison honest; this

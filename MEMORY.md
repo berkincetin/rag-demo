@@ -18,20 +18,20 @@
 | [CLAUDE.md](CLAUDE.md) | Her oturum başı — çalışma kuralları | ~340 satır |
 | [PROGRESSION.md](PROGRESSION.md) | Her oturum başı — aktif task ve sıradaki adım | ~180 satır |
 | **MEMORY.md** (bu dosya) | Her oturum başı — kararlar ve tuzaklar | ~120 satır |
-| [docs/superpowers/plans/rag-agent/00-overview.md](docs/superpowers/plans/rag-agent/00-overview.md) | 🚦 Her task başı — global kısıtlar | 100 satır |
+| `docs/superpowers/plans/rag-agent/00-overview.md` | 🚦 Her task başı — global kısıtlar | 100 satır |
 | `docs/superpowers/plans/rag-agent/NN-*.md` | 🚦 **Sadece aktif task'ınki** | 111–303 satır |
-| [docs/01-veri-kesif-bulgulari.md](docs/01-veri-kesif-bulgulari.md) | Bir test assertion'ı tutmadığında — ölçülmüş gerçekler burada | ~270 satır |
-| [docs/02-karar-kaydi.md](docs/02-karar-kaydi.md) | "Neden bu teknoloji?" sorusu çıkınca (10 ADR) | ~230 satır |
+| [docs/planlama/01-veri-kesif-bulgulari.md](docs/planlama/01-veri-kesif-bulgulari.md) | Bir test assertion'ı tutmadığında — ölçülmüş gerçekler burada | ~270 satır |
+| [docs/planlama/02-karar-kaydi.md](docs/planlama/02-karar-kaydi.md) | "Neden bu teknoloji?" sorusu çıkınca (10 ADR) | ~230 satır |
 | [docs/bolum1-rag/TRD.md](docs/bolum1-rag/TRD.md) | README'nin ASCII mimari diyagramı için (Task 14) | ~460 satır |
 | [docs/bolum1-rag/PRD.md](docs/bolum1-rag/PRD.md) | Kabul kriterleri ve 8 demo sorusu için (Task 14) | ~190 satır |
-| [docs/00-case-analizi.md](docs/00-case-analizi.md) | "Case bunu istiyor mu?" sorusunda — izlenebilirlik matrisi | ~100 satır |
+| [docs/planlama/00-case-analizi.md](docs/planlama/00-case-analizi.md) | "Case bunu istiyor mu?" sorusunda — izlenebilirlik matrisi | ~100 satır |
 | `docs/bolum*/UYGULAMA-PLANI.md` | ⚠️ **Uygulanmaz** — sadece faz gerekçesi merak edilirse | — |
 
 ---
 
 ## 1. Kesinleşmiş Kararlar
 
-Tam gerekçeler: [docs/02-karar-kaydi.md](docs/02-karar-kaydi.md)
+Tam gerekçeler: [docs/planlama/02-karar-kaydi.md](docs/planlama/02-karar-kaydi.md)
 
 | Konu | Karar | Tarih |
 |---|---|---|
@@ -62,7 +62,7 @@ Tam gerekçeler: [docs/02-karar-kaydi.md](docs/02-karar-kaydi.md)
 
 ## 2. Veri Tuzakları (ölçülerek tespit edildi)
 
-Tam detay: [docs/01-veri-kesif-bulgulari.md](docs/01-veri-kesif-bulgulari.md)
+Tam detay: [docs/planlama/01-veri-kesif-bulgulari.md](docs/planlama/01-veri-kesif-bulgulari.md)
 
 ### Bölüm 1 — RAG korpusu
 
@@ -404,7 +404,7 @@ teorik olarak koşudan koşuya farklı karar alabilir.
 
 ### Sağlayıcı Merkezi — Task 1–13 (2026-08-02)
 
-Plan: [docs/superpowers/plans/saglayici-merkezi/](docs/superpowers/plans/saglayici-merkezi/).
+Plan: `docs/superpowers/plans/saglayici-merkezi/`.
 Dört commit: `feat(providers)`, `feat(agent)` (LangGraph), `feat(ui)`, `feat(setup)`.
 
 | Konu | Öğrenilen |

@@ -31,8 +31,10 @@ services:
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
       # Tarayıcı her iki servise de host üzerinden gider; konteyner adları
-      # tarayıcı tarafında çözümlenmez.
-      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      # tarayıcı tarafında çözümlenmez. WEB_PORT değiştirilirse arayüzün
+      # kaynağı (origin) da değişir, bu yüzden aynı değişkeni buraya da
+      # geçiriyoruz — aksi hâlde sayfa açılır ama her API çağrısı CORS'a takılır.
+      CORS_ORIGINS: http://localhost:${WEB_PORT:-3000},http://127.0.0.1:${WEB_PORT:-3000}
     volumes:
       - ./data:/app/data
       - ./storage:/app/storage
@@ -49,7 +51,12 @@ services:
       args:
         # Derleme zamanında gömülür: tarayıcıda çalışan kod host'tan çağırır.
         NEXT_PUBLIC_API_URL: http://localhost:8000
-    ports: ["3000:3000"]
+    # Host portu değiştirilebilir: makinede 3000'i tutan başka bir geliştirme
+    # sunucusu varsa konteyner "Created" durumunda takılı kalıyor ve
+    # `docker compose up` çıktısında hata görünmüyor. WEB_PORT=3001 gibi bir
+    # değer vererek çakışma çözülür; varsayılan 3000 (README ve CORS bu portu
+    # varsayıyor — değiştirirsen api'nin CORS_ORIGINS değeri de eşleşmeli).
+    ports: ["${WEB_PORT:-3000}:3000"]
     depends_on: [api]
 
   rag:

@@ -26,7 +26,7 @@ land there, both of which used to throw away a correct context:
   Phi-4-mini-instruct returns an empty message while the tool schema is in
                       front of it, and answers normally once it is withheld
 
-See docs/02-karar-kaydi.md ADR-011 for why this replaced the raw loop.
+See docs/planlama/02-karar-kaydi.md ADR-011 for why this replaced the raw loop.
 """
 
 import re

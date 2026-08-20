@@ -16,7 +16,7 @@ each is now its own node, so the flow can be inspected and every step measured:
         ▼
       finish
 
-See docs/02-karar-kaydi.md ADR-011 for why this replaced the raw loop.
+See docs/planlama/02-karar-kaydi.md ADR-011 for why this replaced the raw loop.
 """
 
 from typing import Any, TypedDict

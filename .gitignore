@@ -233,6 +233,7 @@ figures/
 
 # Claude Code local config and project-scoped skills (superpowers, MIT — not part of delivery)
 .claude/
+.superpowers/
 
 # Teslim paketi (scripts/package.py ile üretilir — git archive DEĞİL, çünkü
 # web/ ve gradio_app.py untracked, data/ ise bilerek gitignore'da ama pakete girmeli)
@@ -240,3 +241,10 @@ rag-demo.zip
 
 # Bolum 2 teslim paketi (scripts/package_bolum2.py ile uretilir)
 bolum2-analiz.zip
+
+# --- Superpowers plan/spec dosyalari (calisma notlari, teslimin parcasi degil) ---
+# Bu klasor uygulama planlarini ve spec'leri tutuyordu. Iceride gercek Azure
+# kaynak adlari (endpoint, container registry) geciyor; anahtar degil ama
+# altyapi isimlendirmesini disari acmanin gerekcesi yok. docs/ artik sunum ve
+# teslim dokumanlari icin kullaniliyor.
+docs/superpowers/

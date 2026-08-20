@@ -1,7 +1,7 @@
 # TRD — Bölüm 1: RAG Tabanlı AI Agent
 
-Teknik tasarım dokümanı. Kararların gerekçeleri [../02-karar-kaydi.md](../02-karar-kaydi.md),
-veri gerçekleri [../01-veri-kesif-bulgulari.md](../01-veri-kesif-bulgulari.md) dosyalarında.
+Teknik tasarım dokümanı. Kararların gerekçeleri [../02-karar-kaydi.md](../planlama/02-karar-kaydi.md),
+veri gerçekleri [../01-veri-kesif-bulgulari.md](../planlama/01-veri-kesif-bulgulari.md) dosyalarında.
 
 ---
 

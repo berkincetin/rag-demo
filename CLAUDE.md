@@ -22,10 +22,10 @@ already recorded in the PRDs; if you think something must be added, ask first.
 
 | Document | Why you need it |
 |---|---|
-| [docs/README.md](docs/README.md) | Index of all planning docs |
-| [docs/00-case-analizi.md](docs/00-case-analizi.md) | Requirement traceability matrix — every case requirement → where it is satisfied |
-| [docs/01-veri-kesif-bulgulari.md](docs/01-veri-kesif-bulgulari.md) | **Measured** data findings. Not assumptions. Several of them change the implementation |
-| [docs/02-karar-kaydi.md](docs/02-karar-kaydi.md) | 10 ADRs — the "why" behind every technology choice |
+| [docs/planlama/README.md](docs/planlama/README.md) | Index of all planning docs |
+| [docs/planlama/00-case-analizi.md](docs/planlama/00-case-analizi.md) | Requirement traceability matrix — every case requirement → where it is satisfied |
+| [docs/planlama/01-veri-kesif-bulgulari.md](docs/planlama/01-veri-kesif-bulgulari.md) | **Measured** data findings. Not assumptions. Several of them change the implementation |
+| [docs/planlama/02-karar-kaydi.md](docs/planlama/02-karar-kaydi.md) | 10 ADRs — the "why" behind every technology choice |
 | [docs/bolum1-rag/](docs/bolum1-rag/) | Part 1 PRD (acceptance criteria), TRD (technical design). **Background, not the execution plan** |
 | [docs/bolum2-analiz/](docs/bolum2-analiz/) | Part 2 PRD, TRD. **Background, not the execution plan** |
 
@@ -44,10 +44,10 @@ vs "Task 3 Step 2") in commits, PROGRESSION.md, or status reports — use task n
 ### The executable plan — read one task file at a time
 
 Part 1 is broken into **14 task files** under
-[docs/superpowers/plans/rag-agent/](docs/superpowers/plans/rag-agent/). Each task carries
+`docs/superpowers/plans/rag-agent/`. Each task carries
 its own tests, implementation code, commands, and expected output — it is self-contained.
 
-**Reading rule:** read [00-overview.md](docs/superpowers/plans/rag-agent/00-overview.md)
+**Reading rule:** read `00-overview.md`
 (100 lines: goal, global constraints, task sequence) plus **exactly one** task file
 (111–303 lines). Never load the whole task set — the constraints you need are in the
 overview, and the neighbouring task interfaces you need are in your own task's
@@ -185,7 +185,7 @@ imagination. Examples:
   boundary, and mock the LLM client when testing the agent loop's control flow.
 - **Never** use `@pytest.mark.skip` or `xfail` to get a phase to pass. If a test fails,
   fix the root cause or report the blocker.
-- Test data assertions come from [docs/01-veri-kesif-bulgulari.md](docs/01-veri-kesif-bulgulari.md).
+- Test data assertions come from [docs/planlama/01-veri-kesif-bulgulari.md](docs/planlama/01-veri-kesif-bulgulari.md).
   Those numbers were measured — trust them, and if reality disagrees, investigate before
   changing the assertion.
 - Tests live in `tests/`, named `test_<module>.py`. Integration tests are marked
@@ -311,7 +311,7 @@ regenerable, `__pycache__/`, notebook checkpoints.
 
 - **OS:** Windows 11. Primary shell is **PowerShell**; a Bash tool is also available.
   Each takes its own syntax — PowerShell has no `&&`, no `||`, no ternary.
-- **Python:** 3.10.3 at `C:\Users\Polinity\AppData\Local\Programs\Python\Python310`.
+- **Python:** 3.10.3 yerel kurulum (`python --version` ile dogrulayin).
   Already installed: `pandas`, `openpyxl`, `python-docx`, `pypdf`.
 - **Console encoding is cp1252.** Any script that prints Turkish text needs
   `PYTHONIOENCODING=utf-8`, or it raises `UnicodeEncodeError`. In Python entry points,
@@ -340,7 +340,7 @@ evaluator cannot run `ingest.py`. This is a checklist item in the final phase of
 ## 9. Critical domain knowledge
 
 These were measured from the actual data. Getting them wrong breaks the deliverable.
-Full detail in [docs/01-veri-kesif-bulgulari.md](docs/01-veri-kesif-bulgulari.md).
+Full detail in [docs/planlama/01-veri-kesif-bulgulari.md](docs/planlama/01-veri-kesif-bulgulari.md).
 
 ### Part 1 — RAG corpus
 1. **Turkish character inconsistency.** DOCX files are ASCII-folded (`Insan Kaynaklari`),

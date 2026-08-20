@@ -7,7 +7,7 @@
 Gemini tool şeması hatası düzeltildi, model `gemini-3.5-flash` oldu. 314 test, %95,07 kapsam.
 **Aktif bölüm:** Her iki bölüm de tamamlandı. Bölüm 1 (14/14) + Sağlayıcı Merkezi
 genişletmesi (17/17) + Bölüm 2 (11/11).
-**Okunacak dosya:** [Bölüm 2 plan genel bakışı](docs/superpowers/plans/analiz/00-overview.md)
+**Okunacak dosya:** `Bölüm 2 plan genel bakışı`
 **Sıradaki somut adım:** Teslim paketi — ZIP'e `data/` ve `AI Engineer/bolum2_veriseti.xlsx` elle eklenmeli
 
 > ✅ **Bölüm 2 tamamlandı** (2026-08-04). Kalan tek iş teslim paketinin hazırlanması.
@@ -36,26 +36,26 @@ Legend: ⬜ başlamadı · 🔄 devam ediyor · ✅ tamamlandı · ⚠️ engell
 
 ## Bölüm 1 — RAG Agent
 
-Plan: [docs/superpowers/plans/rag-agent/](docs/superpowers/plans/rag-agent/) — 14 task, her biri kendi commit'i ile kapanır.
+Plan: `docs/superpowers/plans/rag-agent/` — 14 task, her biri kendi commit'i ile kapanır.
 Kavramsal arka plan: [docs/bolum1-rag/UYGULAMA-PLANI.md](docs/bolum1-rag/UYGULAMA-PLANI.md) (faz anlatısı).
 
 | # | Task | Dosya | Durum | Testler | Commit |
 |---|---|---|---|---|---|
-| 1 | İskelet, config, modeller | [01](docs/superpowers/plans/rag-agent/01-skeleton-config-models.md) | ✅ | 6/6 ✅ %100 cov | `feat(config)` |
-| 2 | Türkçe normalizasyon | [02](docs/superpowers/plans/rag-agent/02-normalize.md) | ✅ | 7/7 ✅ %100 cov | `feat(normalize)` |
-| 3 | PDF loader ⚠️ | [03](docs/superpowers/plans/rag-agent/03-pdf-loader.md) | ✅ | 5 unit + 3 integ ✅ | `feat(loaders)` |
-| 4 | DOCX loader (tablolar!) ⚠️ | [04](docs/superpowers/plans/rag-agent/04-docx-loader.md) | ✅ | 3 unit + 3 integ ✅ %100 cov | `feat(loaders)` |
-| 5 | XLSX loader | [05](docs/superpowers/plans/rag-agent/05-xlsx-loader.md) | ✅ | 3 unit + 3 integ ✅ %94 cov | `feat(loaders)` |
-| 6 | Loader dispatch | [06](docs/superpowers/plans/rag-agent/06-loader-dispatch.md) | ✅ | 2 unit + 3 integ ✅ %100 cov | `feat(loaders)` |
-| 7 | Chunker + atıf etiketleri | [07](docs/superpowers/plans/rag-agent/07-chunker.md) | ✅ | 11 unit + 3 integ ✅ %98 cov | `feat(chunker)` |
-| 8 | İndeks + ingest | [08](docs/superpowers/plans/rag-agent/08-index-ingest.md) | ✅ | 4 integ ✅ %100 cov | `feat(index)` |
-| 9 | Hibrit retriever 🎯 | [09](docs/superpowers/plans/rag-agent/09-retriever.md) | ✅ | 8 unit + 7 integ ✅ %100 cov | `feat(retriever)` |
-| 10 | Tool'lar + promptlar | [10](docs/superpowers/plans/rag-agent/10-tools-prompts.md) | ✅ | 10 unit ✅ %94 cov | `feat(tools)` |
-| 11 | LLM sağlayıcıları | [11](docs/superpowers/plans/rag-agent/11-llm-providers.md) | ✅ | 6 unit + 2 skip (SDK yok) ✅ | `feat(llm)` |
-| 12 | Agent döngüsü + güvenlik ağı | [12](docs/superpowers/plans/rag-agent/12-agent.md) | ✅ | 7 unit ✅ %100 cov + uçtan uca | `feat(agent)` |
-| 13 | CLI + Streamlit | [13](docs/superpowers/plans/rag-agent/13-frontends.md) | ✅ | 3 unit ✅ + CLI & UI elle doğrulandı | `feat(cli)` |
-| 14 | Demo, Docker, README | [14](docs/superpowers/plans/rag-agent/14-demo-docker-readme.md) | ✅ | notebook 9 senaryo, 0 hata | `docs` |
-| — | Doğrulama listesi | [99](docs/superpowers/plans/rag-agent/99-verification-checklist.md) | ✅ | 11/12 ✅, 1 kısmi (aşağıda) | — |
+| 1 | İskelet, config, modeller | `01` | ✅ | 6/6 ✅ %100 cov | `feat(config)` |
+| 2 | Türkçe normalizasyon | `02` | ✅ | 7/7 ✅ %100 cov | `feat(normalize)` |
+| 3 | PDF loader ⚠️ | `03` | ✅ | 5 unit + 3 integ ✅ | `feat(loaders)` |
+| 4 | DOCX loader (tablolar!) ⚠️ | `04` | ✅ | 3 unit + 3 integ ✅ %100 cov | `feat(loaders)` |
+| 5 | XLSX loader | `05` | ✅ | 3 unit + 3 integ ✅ %94 cov | `feat(loaders)` |
+| 6 | Loader dispatch | `06` | ✅ | 2 unit + 3 integ ✅ %100 cov | `feat(loaders)` |
+| 7 | Chunker + atıf etiketleri | `07` | ✅ | 11 unit + 3 integ ✅ %98 cov | `feat(chunker)` |
+| 8 | İndeks + ingest | `08` | ✅ | 4 integ ✅ %100 cov | `feat(index)` |
+| 9 | Hibrit retriever 🎯 | `09` | ✅ | 8 unit + 7 integ ✅ %100 cov | `feat(retriever)` |
+| 10 | Tool'lar + promptlar | `10` | ✅ | 10 unit ✅ %94 cov | `feat(tools)` |
+| 11 | LLM sağlayıcıları | `11` | ✅ | 6 unit + 2 skip (SDK yok) ✅ | `feat(llm)` |
+| 12 | Agent döngüsü + güvenlik ağı | `12` | ✅ | 7 unit ✅ %100 cov + uçtan uca | `feat(agent)` |
+| 13 | CLI + Streamlit | `13` | ✅ | 3 unit ✅ + CLI & UI elle doğrulandı | `feat(cli)` |
+| 14 | Demo, Docker, README | `14` | ✅ | notebook 9 senaryo, 0 hata | `docs` |
+| — | Doğrulama listesi | `99` | ✅ | 11/12 ✅, 1 kısmi (aşağıda) | — |
 
 ### Doğrulama listesi sonucu
 
@@ -140,9 +140,9 @@ Kavramsal arka plan: [docs/bolum1-rag/UYGULAMA-PLANI.md](docs/bolum1-rag/UYGULAM
 
 ## Sağlayıcı Merkezi genişletmesi
 
-Plan: [docs/superpowers/plans/saglayici-merkezi/](docs/superpowers/plans/saglayici-merkezi/) —
+Plan: `docs/superpowers/plans/saglayici-merkezi/` —
 13 task + kullanıcı isteğiyle eklenen Task 14–17.
-Tasarım: [spec](docs/superpowers/specs/2026-08-02-saglayici-merkezi-tasarim.md).
+Tasarım: `spec`.
 
 | # | Task | Durum | Not |
 |---|---|---|---|
@@ -169,7 +169,7 @@ Tasarım: [spec](docs/superpowers/specs/2026-08-02-saglayici-merkezi-tasarim.md)
 
 ## Bölüm 2 — Satış Analizi
 
-Plan: [docs/superpowers/plans/analiz/](docs/superpowers/plans/analiz/) — 11 task,
+Plan: `docs/superpowers/plans/analiz/` — 11 task,
 her biri kendi commit'i ile kapandı.
 Kavramsal arka plan (⚠️ uygulanmaz):
 [docs/bolum2-analiz/UYGULAMA-PLANI.md](docs/bolum2-analiz/UYGULAMA-PLANI.md)

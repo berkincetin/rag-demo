@@ -1,0 +1,18 @@
+# Git, icerigine bakarak dosyayi metin sanabiliyor ve satir sonlarini
+# donusturuyor. Bir PDF/PPTX/PNG icin bu dosyayi BOZAR: checkout'ta LF -> CRLF
+# cevrimi baytlari degistirir ve dosya acilmaz hale gelir.
+# `binary` = "diff alma, satir sonuna dokunma".
+
+*.pdf   binary
+*.pptx  binary
+*.docx  binary
+*.xlsx  binary
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.zip   binary
+*.pkl   binary
+
+# Notebook'lar JSON: metin olarak kalsinlar ama satir sonu her yerde LF olsun,
+# yoksa Windows/Linux arasinda tum dosya degismis gorunur.
+*.ipynb text eol=lf

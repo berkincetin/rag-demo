@@ -56,7 +56,7 @@ var: A'da 10 (Ürün-A…J), B'de 4, C'de 2, D'de 2.
 ### 3.2 Kapsam İçi — Altyapı
 
 - **B1.** Wide → tidy dönüşümü (3 satırlık hiyerarşik başlık).
-- **B2.** Veri temizleme boru hattı ([../01-veri-kesif-bulgulari.md](../01-veri-kesif-bulgulari.md) §2.3–2.5'teki 7 sorunun hepsi).
+- **B2.** Veri temizleme boru hattı ([../01-veri-kesif-bulgulari.md](../planlama/01-veri-kesif-bulgulari.md) §2.3–2.5'teki 7 sorunun hepsi).
 - **B3.** Temizleme kurallarının **birim testleri** — özellikle MF ölçek düzeltmesi.
 - **B4.** Veri kalitesi raporu (notebook'un ilk bölümü): hangi kayıt kaç kez düzeltildi.
 

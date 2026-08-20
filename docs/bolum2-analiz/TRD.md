@@ -1,7 +1,7 @@
 # TRD — Bölüm 2: İlaç Sektörü Satış & Talep Analizi
 
-Veri gerçekleri: [../01-veri-kesif-bulgulari.md](../01-veri-kesif-bulgulari.md) §2.
-Kararlar: [../02-karar-kaydi.md](../02-karar-kaydi.md) ADR-009, ADR-010.
+Veri gerçekleri: [../01-veri-kesif-bulgulari.md](../planlama/01-veri-kesif-bulgulari.md) §2.
+Kararlar: [../02-karar-kaydi.md](../planlama/02-karar-kaydi.md) ADR-009, ADR-010.
 
 ---
 

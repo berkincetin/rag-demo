@@ -2,7 +2,7 @@
 
 Default is Ollama so the system runs fully offline (the case prefers a local
 model). Cloud providers are one environment variable away when local
-tool-calling proves unreliable. See docs/02-karar-kaydi.md ADR-007.
+tool-calling proves unreliable. See docs/planlama/02-karar-kaydi.md ADR-007.
 """
 
 import json

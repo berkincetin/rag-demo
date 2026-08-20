@@ -334,9 +334,9 @@ Ingest süresi ~55 sn (CPU, model önbellekteyken).
 | LLM | **Takılabilir katman, varsayılan Ollama** | Case lokal çalışabilirliği tercih ediyor. Yerel model yetersiz kalırsa `LLM_PROVIDER` ile buluta geçiş tek satır |
 
 > 📌 **Bu karar bir kez değişti.** İlk sürüm agent döngüsünü de ham Python ile yazmıştı
-> ([ADR-001](docs/02-karar-kaydi.md)) ve o ölçekte gerekçesi doğruydu: tek sağlayıcı, tek
+> ([ADR-001](docs/planlama/02-karar-kaydi.md)) ve o ölçekte gerekçesi doğruydu: tek sağlayıcı, tek
 > düz akış. Sağlayıcı Merkezi genişlemesi bu varsayımı bozunca döngü LangGraph'a taşındı
-> ([ADR-011](docs/02-karar-kaydi.md), ADR-001'i geçersiz kılar). **Retrieval, chunking ve
+> ([ADR-011](docs/planlama/02-karar-kaydi.md), ADR-001'i geçersiz kılar). **Retrieval, chunking ve
 > loader'lar hâlâ tamamen kendi kodumuz** — framework yalnızca agent akışını yönetiyor.
 >
 > Migrasyonun kabul kriteri sertti: `tests/test_agent.py` **tek karakter değişmeden**
